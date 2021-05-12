@@ -13,11 +13,21 @@ load("FAT_monthly.RData")
 load("FAT_static.RData")
 load("FAT_yearly.RData")
 
+# First drop the rows with NAs in MV, MV.USD, RET.USD to make the dataframe smaller
+FAT.monthly <- FAT.monthly %>% drop_na(MV, MV.USD, RET.USD)
+
+# Drop the rows that only have NA Values for the WC columns
+# ncol gives total amount of columns - 5 for the first 5 columns that have values for every row but are not of interest
+FAT.yearly <- FAT.yearly[rowSums(is.na(FAT.yearly)) != ncol(FAT.yearly) - 5,]
+
+
 WC_Variables <- read_csv("FAT_yearly_renamed.csv", skip = 1)
 #Change column names of the FAT.yearly dataframe
 FAT.yearly_renamed <- FAT.yearly
 names(FAT.yearly_renamed) <- names(WC_Variables)
 FAT.yearly_renamed <- rename(FAT.yearly_renamed, Id = X1, country = X2, ICBSUC = X3, YEAR = X5)
+
+rm(WC_Variables)
 
 #Merge the FAT.yearly data with the monthly data
 FAT.monthly[, month := month(Date)]
@@ -27,12 +37,44 @@ hlpvariable <- FAT.monthly %>% drop_na(MV.USD) %>%  group_by(Id, year) %>% filte
 hlpvariable <- hlpvariable %>% select(Id, year, MV.USD) %>% rename(MV.USD.June = MV.USD)
 FAT.monthly <- merge(FAT.monthly, hlpvariable, by.x = c("Id", "year"), by.y = c("Id", "year"), all.x = T)
 
+rm(hlpvariable)
+
+#The accounting data ending in calendar year y - 1 is used to predict returns from July of year y to June of year y + 1
+FAT.monthly[, hcjun := ifelse(month>=7, year-1, year-2)]
+# Not exactly sure how to proceed here
+
+#Calculate value variables with the data from FAT.yearly, dont forget to divide by MV from FAT.monthly later and price!
+# Operating accruals = OA deflated by total assets, not sure what deflated means in this context
+# Dont understand the profitability variables
+variables <- FAT.yearly %>% mutate(book_value = WC03501 + WC03263,
+                                         earnings = WC01551,
+                                         cash_flow = WC04860,
+                                   ROE = WC01551 / book_value,
+                                   ROA = WC01551 / WC02999,
+                                   GP_A = (WC01001 - WC01501) / WC02999,
+                                   OP_BE = (WC01001 - WC01051 - WC01101 - WC01251) / book_value,
+                                   OA = (WC02201 - WC02001 - WC03101 + WC03051 + 
+                                           ifelse(WC03063=="NA",0,WC03063) - ifelse(WC01151=="NA",0,WC01151)),
+                                   NOA = (WC02999 - WC02001) - (WC02999 - WC03255 - WC03426 - WC03995)
+                                   ) %>% select(Id, country, YEAR,
+                                                book_value, earnings, cash_flow,
+                                                ROE, ROA, GP_A,
+                                                OP_BE, OA, NOA)
+
+#Define investment variables
+investment_variables <- FAT.yearly %>% group_by(Id) %>% 
+  mutate(ag_y = WC02999, ag_y_1 = lag(WC02999)) %>% 
+  select(Id, country, YEAR, ag_y, ag_y_1)
+
+# Merge the variables with the monthly FAT Data but take into account the time lag
+
+
+
+
 #Redo this but only with the needed calculated columns
 #FAT.ALL <- merge(FAT.monthly, FAT.yearly,
                  #by.x=c("Id", "year"),
                  #by.y=c("Id", "YEAR"))
-
-rm(WC_Variables)
 
 
 #Calculating Total Market Cap for each month
