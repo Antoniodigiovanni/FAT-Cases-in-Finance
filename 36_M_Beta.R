@@ -13,7 +13,19 @@ load("FAT_monthly.RData")
 load("FAT_static.RData")
 load("FAT_yearly.RData")
 
-WC_Variables <- read_csv("FAT_yearly_renamed.csv")
+WC_Variables <- read_csv("FAT_yearly_renamed.csv", skip = 1)
+#Change column names of the FAT.yearly dataframe
+names(FAT.yearly) <- names(WC_Variables)
+FAT.yearly <- rename(FAT.yearly, Id = X1, country = X2, ICBSUC = X3, YEAR = X5)
+
+#Merge the FAT.yearly data with the monthly data
+FAT.monthly[, month := month(Date)]
+FAT.monthly[, year := year(Date)]
+
+FAT.ALL <- merge(FAT.monthly, FAT.yearly,
+                 by.x=c("Id", "year"),
+                 by.y=c("Id", "YEAR"))
+
 rm(WC_Variables)
 
 
