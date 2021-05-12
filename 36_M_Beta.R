@@ -15,16 +15,22 @@ load("FAT_yearly.RData")
 
 WC_Variables <- read_csv("FAT_yearly_renamed.csv", skip = 1)
 #Change column names of the FAT.yearly dataframe
-names(FAT.yearly) <- names(WC_Variables)
-FAT.yearly <- rename(FAT.yearly, Id = X1, country = X2, ICBSUC = X3, YEAR = X5)
+FAT.yearly_renamed <- FAT.yearly
+names(FAT.yearly_renamed) <- names(WC_Variables)
+FAT.yearly_renamed <- rename(FAT.yearly_renamed, Id = X1, country = X2, ICBSUC = X3, YEAR = X5)
 
 #Merge the FAT.yearly data with the monthly data
 FAT.monthly[, month := month(Date)]
 FAT.monthly[, year := year(Date)]
 
-FAT.ALL <- merge(FAT.monthly, FAT.yearly,
-                 by.x=c("Id", "year"),
-                 by.y=c("Id", "YEAR"))
+hlpvariable <- FAT.monthly %>% drop_na(MV.USD) %>%  group_by(Id, year) %>% filter(month == 6)
+hlpvariable <- hlpvariable %>% select(Id, year, MV.USD) %>% rename(MV.USD.June = MV.USD)
+FAT.monthly <- merge(FAT.monthly, hlpvariable, by.x = c("Id", "year"), by.y = c("Id", "year"), all.x = T)
+
+#Redo this but only with the needed calculated columns
+#FAT.ALL <- merge(FAT.monthly, FAT.yearly,
+                 #by.x=c("Id", "year"),
+                 #by.y=c("Id", "YEAR"))
 
 rm(WC_Variables)
 
