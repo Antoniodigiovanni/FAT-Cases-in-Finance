@@ -38,21 +38,79 @@ hlpvariable <- FAT.monthly %>% drop_na(MV.USD) %>%  group_by(Id, year) %>% filte
 hlpvariable <- hlpvariable %>% select(Id, year, MV.USD) %>% rename(MV.USD.June = MV.USD)
 FAT.monthly <- merge(FAT.monthly, hlpvariable, by.x = c("Id", "hcjun"), by.y = c("Id", "year"), all.x = T)
 
-setorder(FAT.monthly,Date,-MV.USD.June)
-hlpvariable2 <- FAT.monthly[month==7 & !is.na(MV.USD.June),
-                                .(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.9,"Small","Big"),Id),
-                                by=year]
+# Create the big/small portfolios for every country
+hkg <- FAT.monthly %>% filter(country == "HKG")
+pf_size_hkg <- hkg[month==7 & !is.na(MV.USD.June),
+                       .(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.97,"Micro",
+                                          ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big")),Id),
+                       by=year]
 
-panel_country <- merge(FAT.monthly,hlpvariable2,
-                       by.x=c("hcjun","Id"),
-                       by.y=c("year","Id"),
-                       all.x=T)
+panel_hkg <- merge(hkg,pf_size_hkg,
+                   by.x=c("hcjun","Id"),
+                   by.y=c("year","Id"),
+                   all.x=T)
+
+panel_hkg <- panel_hkg %>% drop_na(pf.size) %>% filter(pf.size %in% c("Big", "Small"))
+
+rm(pf_size_hkg, hkg)
+
+sgp <- FAT.monthly %>% filter(country == "SGP")
+pf_size_sgp <- sgp[month==7 & !is.na(MV.USD.June),
+                   .(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.97,"Micro",
+                                      ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big")),Id),
+                   by=year]
+
+panel_sgp <- merge(sgp,pf_size_sgp,
+                   by.x=c("hcjun","Id"),
+                   by.y=c("year","Id"),
+                   all.x=T)
+
+panel_sgp <- panel_sgp %>% drop_na(pf.size) %>% filter(pf.size %in% c("Big", "Small"))
+
+rm(pf_size_sgp, sgp)
+
+kor <- FAT.monthly %>% filter(country == "KOR")
+pf_size_kor <- kor[month==7 & !is.na(MV.USD.June),
+                   .(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.97,"Micro",
+                                      ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big")),Id),
+                   by=year]
+
+panel_kor <- merge(kor,pf_size_kor,
+                   by.x=c("hcjun","Id"),
+                   by.y=c("year","Id"),
+                   all.x=T)
+
+panel_kor <- panel_kor %>% drop_na(pf.size) %>% filter(pf.size %in% c("Big", "Small"))
+
+rm(pf_size_kor, kor)
+
+twn <- FAT.monthly %>% filter(country == "TWN")
+pf_size_twn <- twn[month==7 & !is.na(MV.USD.June),
+                   .(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.97,"Micro",
+                                      ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big")),Id),
+                   by=year]
+
+panel_twn <- merge(twn,pf_size_twn,
+                   by.x=c("hcjun","Id"),
+                   by.y=c("year","Id"),
+                   all.x=T)
+
+panel_twn <- panel_twn %>% drop_na(pf.size) %>% filter(pf.size %in% c("Big", "Small"))
+
+rm(pf_size_twn, twn)
+
 
 rm(hlpvariable)
 
-#The accounting data ending in calendar year y - 1 is used to predict returns from July of year y to June of year y + 1
-FAT.monthly[, hcjun := ifelse(month>=7, year-1, year-2)]
-# Not exactly sure how to proceed here
+#Now combine all the big stocks from the different countries
+panel_all_countries <- rbind(panel_hkg, panel_kor, panel_sgp, panel_twn)
+panel_all_countries <- panel_all_countries %>% filter(pf.size == "Big")
+
+rm(panel_hkg, panel_kor, panel_sgp, panel_twn)
+
+#Now we want to add the different factors to the panel data
+#For the yearly accounting data we use the data in year -1 to predict the returns from July of year y to June in year y + 1
+panel_all_countries[, hcjun := ifelse(month>=7, year-1, year-2)]
 
 #Calculate value variables with the data from FAT.yearly, dont forget to divide by MV from FAT.monthly later and price!
 # Operating accruals = OA deflated by total assets, not sure what deflated means in this context
@@ -71,6 +129,17 @@ variables <- FAT.yearly %>% mutate(book_value = WC03501 + WC03263,
                                                 book_value, earnings, cash_flow,
                                                 ROE, ROA, GP_A,
                                                 OP_BE, OA, NOA)
+
+
+panel_all_countries <- merge(panel_all_countries, variables, by.x=c("Id","hcjun"), by.y=c("Id","YEAR"), all.x=T)
+#Create B/M and E/P yearly and monthly
+#Not sure if UP is the right price please check
+#Commonly P/E is used Hanauer is using E/P does it matter?
+panel_all_countries <- panel_all_countries %>% mutate(bm_yearly = book_value / (MV.USD.June*1000) ,
+                                                      bm_monthly = book_value / (MV.USD*1000),
+                                                      pe_monthy = UP / earnings,
+                                                      cp_monthly = cash_flow / UP)
+
 
 #Define investment variables
 investment_variables <- FAT.yearly %>% group_by(Id) %>% 
