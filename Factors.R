@@ -30,7 +30,18 @@ OL = WC02999 - WC03255 - WC03426 - WC03995
 NOA = OA - OL-WC02999
 
 
+###From Guest Lecture
+#Trailing Earnings Yield = Earnings per Share / Price, over Fiscal Year, EPS WC05210
+TEY <- EPS/PCH.USD
 
+#Def from guest lecture: Free Cash Flow = Net Income (WC07250)+ DDA (WC04051)+ Non-Cash items + Delta WC (WC04900)+ (Interest -capitalized interest)*(1-tax) - CapEx
+#Free Cash Flow per share = WC05507, Common shares outstanding= WC05301
+#FCF <- WC05507 * WC05301
+
+#Free Cash Flow Yield (to the Firm)=  FCF/EV
+EV <- BookEquity + NetDebt
+NetDebt <- WC03255 - WC02001 - WC02004 - WC02003
+FCFY <- FCF/EV
 
 
 
