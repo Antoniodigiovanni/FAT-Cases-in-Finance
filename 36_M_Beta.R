@@ -141,20 +141,49 @@ panel_all_countries <- panel_all_countries %>% mutate(bm_yearly = book_value / (
                                                       cp_monthly = cash_flow / UP)
 
 
+#Determine breakpoints for B/M
+hlpvariable2 <- panel_all_countries[month==7 & !is.na(bm_yearly),
+                              .(bm_bb20 = quantile(bm_yearly , probs = c(0.2), na.rm=T),
+                                bm_bb40 = quantile(bm_yearly, probs = c(0.4), na.rm=T),
+                                bm_bb60 = quantile(bm_yearly, probs = c(0.6), na.rm=T),
+                                bm_bb80 = quantile(bm_yearly, probs = c(0.8), na.rm=T),
+                                bm_bb100 = quantile(bm_yearly , probs = c(1.0), na.rm=T)),by=year]
+
+#Not sure if the merge should be with year instead of hcjun
+bm <- merge(panel_all_countries,hlpvariable2,
+                       by.x=c("hcjun"),
+                       by.y=c("year"))
+
+bm[ , pf.bm := ifelse(bm_yearly>bm_bb80, 1,
+                      ifelse((bm_yearly<=bm_bb80 & bm_yearly>bm_bb60), 2,
+                             ifelse(bm_yearly<=bm_bb60 & bm_yearly>bm_bb40, 3,
+                                    ifelse(bm_yearly<=bm_bb40 & bm_yearly>bm_bb20, 4,
+                                           ifelse(bm_yearly<=bm_bb20, 5, NA)))))]
+
+bm <- bm %>% drop_na(pf.bm)
+
+bm[, SIZE_VALUE := paste0(pf.size,".",pf.bm)]
+
+#Calculate returns for the 5 quintiles
+portfolio_returns <- bm[!is.na(pf.size) & !is.na(pf.bm)] %>% # this operator nests functions
+  group_by(Date,SIZE_VALUE) %>% # do "everything" for the groups specified here
+  summarize(ret.port = weighted.mean(RET.USD,
+                                     MV.USD.June)) %>% # vw returns using lagged mcap
+  spread(SIZE_VALUE,ret.port)
+
+#There are some NAs simply because in the first years there are not so much companies I guess
+#Maybe we start in 1990?
+portfolio_returns <- as.data.table(portfolio_returns)
+#Monthly returns
+colSums(portfolio_returns[,2:6], na.rm = T) / nrow(portfolio_returns)
+
+rm(panel_all_countries, hlpvariable2, variables)
+
+
 #Define investment variables
 investment_variables <- FAT.yearly %>% group_by(Id) %>% 
   mutate(ag_y = WC02999, ag_y_1 = lag(WC02999)) %>% 
   select(Id, country, YEAR, ag_y, ag_y_1)
-
-# Merge the variables with the monthly FAT Data but take into account the time lag
-
-
-
-
-#Redo this but only with the needed calculated columns
-#FAT.ALL <- merge(FAT.monthly, FAT.yearly,
-                 #by.x=c("Id", "year"),
-                 #by.y=c("Id", "YEAR"))
 
 
 #Calculating Total Market Cap for each month
