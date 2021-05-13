@@ -32,10 +32,21 @@ rm(WC_Variables)
 #Merge the FAT.yearly data with the monthly data
 FAT.monthly[, month := month(Date)]
 FAT.monthly[, year := year(Date)]
+FAT.monthly[,hcjun := ifelse(month>=7,year,year-1)]
 
 hlpvariable <- FAT.monthly %>% drop_na(MV.USD) %>%  group_by(Id, year) %>% filter(month == 6)
 hlpvariable <- hlpvariable %>% select(Id, year, MV.USD) %>% rename(MV.USD.June = MV.USD)
-FAT.monthly <- merge(FAT.monthly, hlpvariable, by.x = c("Id", "year"), by.y = c("Id", "year"), all.x = T)
+FAT.monthly <- merge(FAT.monthly, hlpvariable, by.x = c("Id", "hcjun"), by.y = c("Id", "year"), all.x = T)
+
+setorder(FAT.monthly,Date,-MV.USD.June)
+hlpvariable2 <- FAT.monthly[month==7 & !is.na(MV.USD.June),
+                                .(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.9,"Small","Big"),Id),
+                                by=year]
+
+panel_country <- merge(FAT.monthly,hlpvariable2,
+                       by.x=c("hcjun","Id"),
+                       by.y=c("year","Id"),
+                       all.x=T)
 
 rm(hlpvariable)
 
