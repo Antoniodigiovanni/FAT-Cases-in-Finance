@@ -177,6 +177,58 @@ portfolio_returns <- as.data.table(portfolio_returns)
 #Monthly returns
 colSums(portfolio_returns[,2:6], na.rm = T) / nrow(portfolio_returns)
 
+#Write a function to do do the portfolio returns for the different factors
+#Somehwere is a mistake
+calc_returns <- function(factor, data) {
+  #First calculate the breakpoints
+  hlpvariable2 <- data[month==7 & !is.na(data[[factor]]),
+                                      .(bb20 = quantile(data[[factor]] , probs = c(0.2), na.rm=T),
+                                        bb40 = quantile(data[[factor]], probs = c(0.4), na.rm=T),
+                                        bb60 = quantile(data[[factor]], probs = c(0.6), na.rm=T),
+                                        bb80 = quantile(data[[factor]], probs = c(0.8), na.rm=T),
+                                        bb100 = quantile(data[[factor]] , probs = c(1.0), na.rm=T)),by=year]
+  #Create new dataframe that stores relevant factor
+  factor_returns <- merge(data,hlpvariable2,
+              by.x=c("hcjun"),
+              by.y=c("year"))
+  #Now assign the stocks to the respective quantiles
+  factor_returns[ , pf.factor := ifelse(factor_returns[[factor]]>bb80, 1,
+                        ifelse((factor_returns[[factor]]<=bb80 & factor_returns[[factor]]>bb60), 2,
+                               ifelse(factor_returns[[factor]]<=bb60 & factor_returns[[factor]]>bb40, 3,
+                                      ifelse(factor_returns[[factor]]<=bb40 & factor_returns[[factor]]>bb20, 4,
+                                             ifelse(factor_returns[[factor]]<=bb20, 5, NA)))))]
+  factor_returns <- factor_returns %>% drop_na(pf.factor)
+  
+  factor_returns[, SIZE_VALUE := paste0(pf.size,".",pf.factor)]
+  
+  #Calculate returns for the 5 quintiles
+  portfolio_returns <- factor_returns[!is.na(pf.size) & !is.na(pf.factor)] %>% # this operator nests functions
+    group_by(Date,SIZE_VALUE) %>% # do "everything" for the groups specified here
+    summarize(ret.port = weighted.mean(RET.USD,
+                                       MV.USD.June)) %>% # vw returns using lagged mcap
+    spread(SIZE_VALUE,ret.port)
+  
+  #There are some NAs simply because in the first years there are not so much companies I guess
+  #Maybe we start in 1990?
+  portfolio_returns <- as.data.table(portfolio_returns)
+  #Monthly returns
+  return (colSums(portfolio_returns[,2:6], na.rm = T) / nrow(portfolio_returns))
+  
+}
+
+calc_returns("bm_yearly", panel_all_countries)
+
+
+panel_all_countries
+hlpvariable2 <- panel_all_countries[month==7 & !is.na(factor),
+                     .(bb20 = quantile(factor , probs = c(0.2), na.rm=T),
+                       bb40 = quantile(factor, probs = c(0.4), na.rm=T),
+                       bb60 = quantile(factor, probs = c(0.6), na.rm=T),
+                       bb80 = quantile(factor, probs = c(0.8), na.rm=T),
+                       bb100 = quantile(factor , probs = c(1.0), na.rm=T)),by=year]
+
+
+
 rm(panel_all_countries, hlpvariable2, variables)
 
 
