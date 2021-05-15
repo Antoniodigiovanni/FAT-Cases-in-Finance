@@ -104,6 +104,7 @@ BetaList = list()
 DatesList = list()
 IdList = list()
 k=0
+j=0
 for (id in Ids) {
   i=0
   df <- Beta_Regr[Id == id]
@@ -122,6 +123,8 @@ for (id in Ids) {
         }
     }
   }
+  j=j+1
+  print(j)
 }
 
 
@@ -138,6 +141,23 @@ rm(Beta_Regr,BetaList,DatesList,
    df,IdList,Market_Portfolio,x,
    Beta,date,i,id,Ids,months,k)
 
-save(Beta_36_M, file = "Beta_36_M.RData")
-# Missing the Beta Merge into the main df...
+Beta_36_M$Id <- factor(Beta_36_M$Id, levels = levels(FAT.monthly$Id))
+
+#save(Beta_36_M, file = "Beta_36_M.RData")
+
+##### Merge Betas into FAT.Monthly ####
+Beta_36_M <- Beta_36_M %>% mutate(
+  Beta.year = year(ym)
+) %>% select(-ym)
+
+
+FAT.monthly[, month := month(Date)]
+FAT.monthly[, year := year(Date)]
+FAT.monthly[, Beta.year:=ifelse(month>=6, year, year-1)]
+
+Test <- left_join(
+  FAT.monthly,
+  Beta_36_M,
+  by = c("Id","Beta.year")
+)
 
