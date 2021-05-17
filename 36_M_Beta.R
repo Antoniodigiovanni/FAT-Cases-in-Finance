@@ -115,7 +115,7 @@ panel_all_countries[, hcjun := ifelse(month>=7, year-1, year-2)]
 #Calculate value variables with the data from FAT.yearly, dont forget to divide by MV from FAT.monthly later and price!
 # Operating accruals = OA deflated by total assets, not sure what deflated means in this context
 # Dont understand the profitability variables
-variables <- FAT.yearly %>% mutate(book_value = WC03501 + WC03263,
+variables <- FAT.yearly %>% mutate(book_value = WC03501 + WC03263,# why not directly WC05491
                                          earnings = WC01551,
                                          cash_flow = WC04860,
                                    ROE = WC01551 / book_value,
