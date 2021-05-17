@@ -84,9 +84,19 @@ beta_data <- merge(beta_data, Market_Portfolio,
 M36_Data <- beta_data %>% group_by(Id) %>% summarize(count = n()) %>% filter(count >= 36)
 beta_data <- merge(beta_data, M36_Data, by = "Id")
 
-coefs <- beta_data %>% group_by(Id, year) %>% do(beta = tidy(lm(RET.USD~RMRF, data = .))) %>% unnest(beta)
-coefs <- coefs %>% filter(term == "RMRF")
-beta_data <- merge(beta_data, coefs, by.x = c("Id", "year"), by.y = c("Id", "year"))
+#coefs <- beta_data %>% group_by(Id) %>% rollapply(beta_data, width = 36, 
+                                                  #FUN = function(z) coef(lm(RET.USD~RMRF, data = beta_data)),
+                                                  #by.column = FALSE, align = "right")
+#beta_data$year <- floor_date(beta_data$Date, "3year")
+
+#test <- beta_data %>% slice(1:10000)
+Coef <- . %>% as.data.frame %>% lm %>% coef
+coefs <- beta_data %>% group_by(Id) %>% do(cbind(reg_col = select(., RET.USD, RMRF) %>% 
+                                              rollapplyr(36, Coef, by.column = FALSE, fill = NA),
+                                            date_col = select(., Date))) %>% 
+  ungroup
+
+
 
 
 ## Rollapply Function (NOT WORKING)
