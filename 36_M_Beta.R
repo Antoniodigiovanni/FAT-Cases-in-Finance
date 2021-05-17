@@ -124,11 +124,17 @@ variables <- FAT.yearly %>% mutate(book_value = WC03501 + WC03263,
                                    OP_BE = (WC01001 - WC01051 - WC01101 - WC01251) / book_value,
                                    OA = (WC02201 - WC02001 - WC03101 + WC03051 + 
                                            ifelse(WC03063=="NA",0,WC03063) - ifelse(WC01151=="NA",0,WC01151)),
-                                   NOA = (WC02999 - WC02001) - (WC02999 - WC03255 - WC03426 - WC03995)
+                                   NOA = (WC02999 - WC02001) - (WC02999 - WC03255 - WC03426 - WC03995),
+                                   OL = WC02999 - WC03255 - WC03426 - WC03995,
+                                   EPS = WC05202,
+                                   TEY = WC05202/PCH.USD,
+                                   BookToEV = WC05491/WC18100,
+                                   DtoE = WC03255 /WC03501,
+                                   QuickRatio = (WC02201 - WC02101) /WC03101
                                    ) %>% select(Id, country, YEAR,
                                                 book_value, earnings, cash_flow,
                                                 ROE, ROA, GP_A,
-                                                OP_BE, OA, NOA)
+                                                OP_BE, OA, NOA, OL, EPS, TEY, BookToEV, DtoE, QuickRatio)
 
 
 panel_all_countries <- merge(panel_all_countries, variables, by.x=c("Id","hcjun"), by.y=c("Id","YEAR"), all.x=T)
