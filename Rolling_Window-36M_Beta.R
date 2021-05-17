@@ -2,6 +2,8 @@ library(data.table)
 library(zoo)
 library(rstudioapi)
 library(tidyverse)
+library(lubridate)
+library(broom)
 
 # Set the working directory to the script directory
 setwd (dirname(getActiveDocumentContext()$path))   
@@ -66,7 +68,26 @@ Market_Portfolio <- Market_Portfolio %>%
 
 rm(FF)
 
+
 #### Beta Calculation ####
+
+# We start in 1994
+Market_Portfolio <- Market_Portfolio %>% filter(ym >= "Jan 1994")
+beta_data <- FAT.monthly %>% filter(ym >= "Jan 1994" & !is.na(RET.USD)) %>% 
+  select(Id, country, Date, MV.USD, RET.USD, ym)
+
+beta_data <- merge(beta_data, Market_Portfolio,
+                   by.x = c("country", "ym"),
+                   by.y = c("Country", "ym"))
+
+# We only include stocks that have more than 36 months of data because we are using 36M rolling window approach
+M36_Data <- beta_data %>% group_by(Id) %>% summarize(count = n()) %>% filter(count >= 36)
+beta_data <- merge(beta_data, M36_Data, by = "Id")
+
+coefs <- beta_data %>% group_by(Id, year) %>% do(beta = tidy(lm(RET.USD~RMRF, data = .))) %>% unnest(beta)
+coefs <- coefs %>% filter(term == "RMRF")
+beta_data <- merge(beta_data, coefs, by.x = c("Id", "year"), by.y = c("Id", "year"))
+
 
 ## Rollapply Function (NOT WORKING)
 # beta.regr <- function(x) {
