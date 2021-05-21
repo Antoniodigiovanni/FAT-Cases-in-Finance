@@ -96,7 +96,7 @@ factors <- all_data %>%
   # Filtering cash flow and earnings measures, 
   # only positive values (as Hanauer, Lauterbach - 2019)
   mutate(BM = (WC03501 + ifelse(is.na(WC03263),0,WC03263)) / (MV.June*1000),
-         BM_m = (WC03501 +ifesle(is.na(WC03263),0,WC03263)) / (MV*1000),
+         BM_m = (WC03501 +ifelse(is.na(WC03263),0,WC03263)) / (MV*1000),
          ROE = WC01551 / (WC03501 + WC03263),
          ROA = WC01551 / WC02999,
          "GP/A" = (WC01001-WC01501)/WC02999,
@@ -110,14 +110,14 @@ factors <- all_data %>%
          # Calculate yearlly increase characteristics like OA, NOA, AG, ...
          ) %>% 
   select(
-    Id, Date, month, year, #country.x 
+    Id, Date, month, year, country, #country.x 
     MV,MV.June,MV.USD, MV.USD.June, RET.USD, ym,
     BM, BM_m, ROE, ROA, "GP/A", "OP/BE", "E/P", "C/P"
     ) #%>% 
   #rename(country = country.x) %>% 
   #drop_na(MV.USD.June)
 
-
+Yearly_factors_list = c("BM","ROE","ROA","GP/A","OP/BE","E/P","C/P")
 # Maybe we can use a dummy variable for when the BM ratio is negative? (only for Regressions)
 # TODO
 # Can we drop the NAs now?
@@ -142,6 +142,7 @@ factors <- merge(factors,hlpvariable,
                  by.y=c("year","Id", "country"),
                  all.x=T)
 
+rm(hlpvariable)
 # Percentage of Micro Stocks in our sample
 nrow(factors %>% filter(pf.size == "Micro")) / nrow(factors)
 # Exclude the Micro Stocks
@@ -151,26 +152,83 @@ ggplot(data = factors) +
   geom_point(mapping = aes(x = MV.USD.June*1000, y = BM))
 # There are some outliers, think about deleting them from the data
 
-
-# Now comes the portfolio sorts
-# Determine the B/M breakpoints based on big stocks only
-hlpvariable2 <- factors[month == 7 & !is.na(BM) & pf.size == "Big"] %>% group_by(country, year) %>% 
-  summarize(bm_bb30 = quantile(BM, probs = c(0.3), na.rm = T),
-         bm_bb70 = quantile(BM, probs = c(0.7), na.rm = T)) %>% select(year, country, bm_bb30, bm_bb70)
-
-factors <- merge(factors,hlpvariable2,
-                       by.x=c("hcjun", "country"),
-                       by.y=c("year", "country"),
-                       all.x=T)
-
-factors[ , pf.bm := ifelse(BM>bm_bb70,"High",
-                                 ifelse((BM<=bm_bb70 & BM>bm_bb30),"Neutral",
-                                        ifelse(BM<=bm_bb30,"Low",NA)))]
-
-factors[, SIZE_VALUE := paste0(pf.size,".",pf.bm)]
-
 # 12-months return factor (Momentum)
 #TODO
+
+
+### Portfolio Sorts ####
+# Now comes the portfolio sorts
+# Determine the B/M breakpoints based on big stocks only
+
+# ORIGINAL CODE
+# hlpvariable2 <- factors[month == 7 & !is.na(BM) & pf.size == "Big"] %>% 
+#   group_by(country, year) %>% 
+#   summarize(bm_bb30 = quantile(BM, probs = c(0.3), na.rm = T),
+#             bm_bb70 = quantile(BM, probs = c(0.7), na.rm = T)) %>% 
+#   select(year, country, bm_bb30, bm_bb70)
+# 
+# factors <- merge(factors,hlpvariable2,
+#                        by.x=c("hcjun", "country"),
+#                        by.y=c("year", "country"),
+#                        all.x=T)
+# 
+# factors[ , pf.bm := ifelse(BM>bm_bb70,"High",
+#                                  ifelse((BM<=bm_bb70 & BM>bm_bb30),"Neutral",
+#                                         ifelse(BM<=bm_bb30,"Low",NA)))]
+# 
+# factors[, SIZE_VALUE := paste0(pf.size,".",pf.bm)]
+
+Factor_Sort <- function(df, factor){
+  require(dplyr)
+  setDT(df)
+  H <- paste0(factor, "_bb70")
+  L <- paste0(factor, "_bb30")
+  Sort_breakpoints <- df[month == 7 & !is.na(df[[factor]]) & pf.size == "Big"] %>% 
+    dplyr::group_by(country, year) %>% 
+    dplyr::summarise(!!sym(L) := quantile(!!sym(factor), probs = c(0.3), na.rm = T),
+                     !!sym(H) := quantile(!!sym(factor), probs = c(0.7), na.rm = T)) %>% 
+    select(year,country, !!sym(L), !!sym(H) ) 
+  
+  df <- merge(df,Sort_breakpoints,
+                   by.x=c("hcjun", "country"),
+                   by.y=c("year", "country"),
+                   all.x=T)
+  
+  Column <- paste0("pf.", factor)
+  Sorted_Column <- df %>% mutate(
+    !!paste0("pf.", factor) := ifelse(!!sym(factor)>!!sym(H),
+                                   "High",
+                                   ifelse((!!sym(factor) <= !!sym(H))
+                                          & !!sym(factor) > !!sym(L),
+                                          "Neutral",
+                                          ifelse(!!sym(factor)<=!!sym(L),
+                                                 "Low",
+                                                 NA)))) %>% 
+    select(Id, country, Date, !!paste0("pf.", factor))
+  
+ 
+  return(Sorted_Column)
+} 
+
+Sorted <- data.table(
+  "Id" = factors$Id,
+  "country" = factors$country,
+  "Date" = factors$Date,
+  "RET.USD" = factors$RET.USD
+)
+
+for (fact in Yearly_factors_list) {
+  
+  Sorted_column <- Factor_Sort(factors, fact)
+  
+  Sorted <- left_join(Sorted,
+                      Sorted_column,
+                      by=c("Id","Date","country"))
+  
+}
+# TODO
+# Calculate portfolio returns for each factor, then calculate returns 
+# for hedge portfolios
 
 ### Portfolio Returns ####
 portfolio_returns <- factors[!is.na(pf.size) & !is.na(pf.bm)] %>% # this operator nests functions
