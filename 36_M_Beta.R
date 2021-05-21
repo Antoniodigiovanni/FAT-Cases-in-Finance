@@ -297,79 +297,56 @@ Market_Portfolio <- Market_Portfolio %>%
 
 rm(FF)
 
-Beta_Regr <- data.frame(
-  "Id" = FAT.monthly$Id,
-  "Country" = FAT.monthly$country,
-  "ym" = FAT.monthly$ym,
-  "Date" = FAT.monthly$Date,
-  "RET.USD" = FAT.monthly$RET.USD)
-  
-Beta_Regr <- Beta_Regr[!is.na(Beta_Regr$RET.USD),  ]
+#### Old - Wrong Beta Regression #####
+# Beta_Regr <- data.frame(
+#   "Id" = FAT.monthly$Id,
+#   "Country" = FAT.monthly$country,
+#   "ym" = FAT.monthly$ym,
+#   "Date" = FAT.monthly$Date,
+#   "RET.USD" = FAT.monthly$RET.USD)
+#   
+# Beta_Regr <- Beta_Regr[!is.na(Beta_Regr$RET.USD),  ]
+# 
+# Beta_Regr <- left_join(Beta_Regr,
+#                        Market_Portfolio[c("Country","ym","RMRF")],
+#                        by = c("Country","ym"))
+# 
+# Beta_Regr <- Beta_Regr %>%
+#   mutate(cut = as.Date(cut(Date, breaks = '36 months'))) #'36 months' #When changing time horizon change also line 138
+# 
+# # Shift cut from 1st of the month to last day of the month
+# day(Beta_Regr$cut) <- days_in_month(Beta_Regr$cut)
+# 
+# 
+# # Perform the regresssion to calculate Betas.
+# Beta.36.Months <- Beta_Regr %>% 
+#   group_by(Id, cut) %>%
+#   # Filter stocks that have been listed at least 12 months in the 36 months group
+#   filter(n() >= 12) %>%
+#   do(lm = lm(RET.USD~RMRF, data = .)) %>% 
+#   mutate(Intercept = summary(lm)$coeff[1],
+#          Beta = summary(lm)$coeff[2]) %>%
+#   select(-lm) %>%
+#   ungroup() %>% 
+#   rename(Beta_group = cut) %>% 
+#   mutate(Beta_group = as.yearmon(Beta_group))
+#   
+# # Assign 36-months Betas to the stocks in the 36-months time-frame
+# 
+# # Using different df for testing purposes (temporary)
+# FAT.monthly_beta <- FAT.monthly_beta %>% 
+#   mutate(cut = as.Date(cut(Date, breaks = '36 months')))
+# 
+# # Shift cut from 1st of the month to last day of the month
+# day(FAT.monthly_beta$cut) <- days_in_month(FAT.monthly_beta$cut)
+# 
+# FAT.monthly_beta <- FAT.monthly_beta %>% 
+#   mutate(cut = as.yearmon(cut)) %>% 
+#   rename(Beta_group = cut)
+# 
+# Beta.36.Months <- Beta.36.Months %>% select(-Intercept)
+# FAT.monthly_beta <- left_join(FAT.monthly_beta,
+#                          Beta.36.Months,
+#                          by = c("Id", "Beta_group"))
+# 
 
-Beta_Regr <- left_join(Beta_Regr,
-                       Market_Portfolio[c("Country","ym","RMRF")],
-                       by = c("Country","ym"))
-
-Beta_Regr <- Beta_Regr %>%
-  mutate(cut = as.Date(cut(Date, breaks = '36 months'))) #'36 months' #When changing time horizon change also line 138
-
-# Shift cut from 1st of the month to last day of the month
-day(Beta_Regr$cut) <- days_in_month(Beta_Regr$cut)
-
-
-# Perform the regresssion to calculate Betas.
-Beta.36.Months <- Beta_Regr %>% 
-  group_by(Id, cut) %>%
-  # Filter stocks that have been listed at least 12 months in the 36 months group
-  filter(n() >= 12) %>%
-  do(lm = lm(RET.USD~RMRF, data = .)) %>% 
-  mutate(Intercept = summary(lm)$coeff[1],
-         Beta = summary(lm)$coeff[2]) %>%
-  select(-lm) %>%
-  ungroup() %>% 
-  rename(Beta_group = cut) %>% 
-  mutate(Beta_group = as.yearmon(Beta_group))
-  
-# Assign 36-months Betas to the stocks in the 36-months time-frame
-
-# Using different df for testing purposes (temporary)
-FAT.monthly_beta <- FAT.monthly_beta %>% 
-  mutate(cut = as.Date(cut(Date, breaks = '36 months')))
-
-# Shift cut from 1st of the month to last day of the month
-day(FAT.monthly_beta$cut) <- days_in_month(FAT.monthly_beta$cut)
-
-FAT.monthly_beta <- FAT.monthly_beta %>% 
-  mutate(cut = as.yearmon(cut)) %>% 
-  rename(Beta_group = cut)
-
-Beta.36.Months <- Beta.36.Months %>% select(-Intercept)
-FAT.monthly_beta <- left_join(FAT.monthly_beta,
-                         Beta.36.Months,
-                         by = c("Id", "Beta_group"))
-
-
-# Select only stocks that have Beta
-#FAT.monthly_beta <- FAT.monthly_beta %>% 
-#  drop_na(Beta)
-
-
-### Plots ####
-
-# Plot Monthly Market Returns of SGP
-Market_Portfolio[Market_Portfolio$Country == "SGP", ] %>% 
-  ggplot(aes(x = ym, y = RM)) +
-  geom_line(color = "darkorchid4") +
-  labs(title = "Monthly Market Returns",
-       y = "Monthly Return",
-       x = "Date") + 
-  theme_bw(base_size = 15)
-
-# Plot RF rate (selecting one country to avoid repetitions)
-Market_Portfolio[Market_Portfolio$Country == "SGP", ] %>% 
-  ggplot(aes(x = ym, y = RF)) +
-  geom_line(color = "darkorchid4") +
-  labs(title = "Monthly Market Returns",
-       y = "Monthly Return",
-       x = "Date") + 
-  theme_bw(base_size = 15)

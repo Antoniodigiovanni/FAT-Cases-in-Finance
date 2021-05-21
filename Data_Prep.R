@@ -18,14 +18,19 @@ load("FAT_yearly.RData")
 # How much missing data for the Return?
 glimpse(FAT.monthly)
 summary(FAT.monthly)
-# Approx. 2.7Mio rows for MV/Ret are N/A
-FAT.monthly <- FAT.monthly %>% drop_na(RET.USD, MV.USD)
+# Approx. 2.7Mio rows for MV/Ret are N/A 
+#Not removing NAs now as we may need to lag one row (to calculate some factors)
+#FAT.monthly <- FAT.monthly %>% drop_na(RET.USD, MV.USD)
 #Plot the return data to check for errors in data, this takes a while
 #Maybe only plot the highest and lowest returns to check for obvious errors
 biggest_losers <- FAT.monthly %>% arrange(RET.USD) %>% slice(1:1000)
+
 ggplot(data = biggest_losers) +
   geom_point(mapping = aes(x = MV.USD, y = RET.USD))
-biggest_winners <- FAT.monthly %>% arrange(desc(RET.USD)) %>% slice(1:1000)
+biggest_winners <- FAT.monthly %>% 
+  arrange(desc(RET.USD)) %>% 
+  slice(1:1000)
+
 ggplot(data = biggest_winners) +
   geom_point(mapping = aes(x = MV.USD, y = RET.USD))
 
@@ -33,6 +38,7 @@ biggest_winners
 rm(biggest_losers, biggest_winners)
 
 # Maybe winsorize the 1% and 99% percentile
+
 # Get data from year 1994 to ensure data quality
 FAT.monthly[, month := month(Date)]
 FAT.monthly[, year := year(Date)]
@@ -41,42 +47,90 @@ FAT.monthly <- FAT.monthly %>% filter(year > 1993)
 # Merge FAT.monthly with the yearly accounting data
 # We use the accounting data in year y to predict the returns from July year+1 to June year +2
 FAT.monthly[,hcjun := ifelse(month>=7,year-1,year-2)]
-all_data <- merge(FAT.monthly, FAT.yearly, by.x = c("Id", "hcjun"), by.y = c("Id", "YEAR"),
-      all.x = T)
+
+# Included only necessary columns of FAT.yearly to reduce the size of all_data
+all_data <- merge(FAT.monthly, 
+                  FAT.yearly[,c("Id","YEAR","WC03501","WC03263","WC01551","WC04860",
+                               "WC02999","WC01001","WC01501","WC01101","WC01251",
+                               "WC02001","WC02201","WC03101","WC03063","WC03255",
+                               "WC03426","WC03995","WC02301","WC02101","WC01051")],
+                  by.x = c("Id", "hcjun"), 
+                  by.y = c("Id", "YEAR"),
+                  all.x = T)
 
 # Create MV.USD.June to get yearly MV that matches with yearly accounting data
 # MV.USD.June in Year y is for July year y until June y + 1
-hlpvariable <- all_data %>% group_by(Id, year) %>% filter(month == 6)
-hlpvariable <- hlpvariable %>% select(Id, year, MV.USD) %>% rename(MV.USD.June = MV.USD)
+hlpvariable <- all_data %>% 
+  #group_by(Id, year) %>% # I don't think group_by is needed here
+  filter(month == 6)
+
+hlpvariable <- hlpvariable %>% 
+  select(Id, year, MV, MV.USD) %>% 
+  rename(MV.USD.June = MV.USD, MV.June = MV)
+
 all_data[,hcjun := ifelse(month>=7,year,year-1)]
-all_data <- merge(all_data, hlpvariable, by.x = c("Id", "hcjun"), by.y = c("Id", "year"),
+all_data <- merge(all_data, 
+                  hlpvariable, 
+                  by.x = c("Id", "hcjun"), 
+                  by.y = c("Id", "year"),
                   all.x = T)
 rm(hlpvariable)
 
 summary(FAT.static)
 sort(unique(FAT.static$INDM))
 # Look out for financial companies (Financial Admin. and Specialty Finance)
+# "Asset Managers", "Banks", "Consumer Finance", "Insurance", "Insurance Brokers"
+# "Private Equity", "Reinsurance", "Venture Capital" ??
 
-# Create variables we want to include in our analysis
+#Maybe do that on FAT.monthly at the beginning
+
+
+#### Create variables we want to include in our analysis ####
 # Data from Datastream is in Millions, Worldscope Data is in 1k
 # Start with value, more to come
 # negative values for Book Value dont make sense, drop these
 # Also for some of the observations we have high BV and low MV, might be currency issue
-factors <- all_data %>% mutate(BM = (WC03501+WC03263) / (MV.USD.June*1000),
-                                BM_m = (WC03501+WC03263) / (MV.USD*1000),
-                                ROE = WC01551 / (WC03501 + WC03263),
-                                ROA = WC01551 / WC02999) %>% select(
-                                  Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, ym,
-                                  BM, BM_m, ROE, ROA
-                                ) %>% rename(country = country.x) %>% drop_na(MV.USD.June)
+# Using MV.June instead of MV.USD.June
 
-factors <- factors %>% drop_na(BM) %>% filter(BM>0)
+factors <- all_data %>% 
+  # Filtering cash flow and earnings measures, 
+  # only positive values (as Hanauer, Lauterbach - 2019)
+  mutate(BM = (WC03501 + ifelse(is.na(WC03263),0,WC03263)) / (MV.June*1000),
+         BM_m = (WC03501 +ifesle(is.na(WC03263),0,WC03263)) / (MV*1000),
+         ROE = WC01551 / (WC03501 + WC03263),
+         ROA = WC01551 / WC02999,
+         "GP/A" = (WC01001-WC01501)/WC02999,
+         "OP/BE" = (ifelse((WC01001 >=0 | WC01051>=0 | WC01101>=0 | WC01251>=0), #Checks also for missing values
+                      (ifelse(is.na(WC01001),0,WC01001) 
+                      - ifelse(is.na(WC01051),0,WC01051)
+                      - ifelse(is.na(WC01101),0,WC01101) 
+                      - ifelse(is.na(WC01251),0,WC01251))/(WC03501+WC03263),NA)),
+         "E/P" = (ifelse(WC01551 >= 0, WC01551, NA)/ UP),
+         "C/P" = (ifelse(WC04860 >= 0, WC04860, NA)/ UP),
+         # Calculate yearlly increase characteristics like OA, NOA, AG, ...
+         ) %>% 
+  select(
+    Id, Date, month, year, #country.x 
+    MV,MV.June,MV.USD, MV.USD.June, RET.USD, ym,
+    BM, BM_m, ROE, ROA, "GP/A", "OP/BE", "E/P", "C/P"
+    ) #%>% 
+  #rename(country = country.x) %>% 
+  #drop_na(MV.USD.June)
+
+
+# Maybe we can use a dummy variable for when the BM ratio is negative? (only for Regressions)
+# TODO
+# Can we drop the NAs now?
+factors <- factors %>% 
+  drop_na(BM) %>% 
+  filter(BM>0)
 
 summary(factors)
 
 # Define stocks into three size groups for each country
 setorder(factors, country, Date, -MV.USD.June)
-hlpvariable <- factors[month == 7 & !is.na(MV.USD.June)] %>% group_by(country, year) %>% 
+hlpvariable <- factors[month == 7 & !is.na(MV.USD.June)] %>% 
+  group_by(country, year) %>%
   mutate(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.97,"Micro",
                           ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big"))) %>% 
   select(country, year, pf.size, Id)
@@ -115,6 +169,10 @@ factors[ , pf.bm := ifelse(BM>bm_bb70,"High",
 
 factors[, SIZE_VALUE := paste0(pf.size,".",pf.bm)]
 
+# 12-months return factor (Momentum)
+#TODO
+
+### Portfolio Returns ####
 portfolio_returns <- factors[!is.na(pf.size) & !is.na(pf.bm)] %>% # this operator nests functions
   group_by(Date,SIZE_VALUE) %>% # do "everything" for the groups specified here
   summarize(ret.port = weighted.mean(RET.USD,
