@@ -11,10 +11,10 @@ setwd (dirname(getActiveDocumentContext()$path))
 Sys.setlocale("LC_TIME", "C")
 
 #Data from Datastream
-load("FAT_monthly.RData")
-load("FAT_static.RData")
+load("Data/FAT_monthly.RData")
+load("Data/FAT_static.RData")
 # Yearly Accounting Data from Worldscope
-load("FAT_yearly.RData")
+load("Data/FAT_yearly.RData")
 
 # Get data from year 1994 to ensure data quality
 FAT.monthly[, month := month(Date)]
@@ -80,3 +80,14 @@ all_data <- merge(all_data, lag_variables, by.x = c("Id", "hcjun"), by.y = c("Id
 
 # Beta calculation
 # Delete all unnecessary dataframes
+# momentum
+
+#test <- beta_data %>% slice(1:10000)
+test <- FAT.monthly %>% slice(1:250000)
+Coef <- . %>% as.data.frame %>% cumsum %>% coef
+coefs <- test %>% group_by(Id) %>% do(cbind(reg_col = select(., RET) %>% 
+                                                   rollapplyr(list(seq(-12, -2)), sum, by.column = FALSE, fill = NA),
+                                                 date_col = select(., Date))) %>% 
+  ungroup
+
+test <- FAT.monthly %>% group_by(Id) %>% do(rollapplyr(12, cumsum(RET)))

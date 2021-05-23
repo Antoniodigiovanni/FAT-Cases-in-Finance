@@ -44,5 +44,8 @@ NetDebt <- WC03255 - WC02001 - WC02004 - WC02003
 FCFY <- FCF/EV
 
 
+# Momentum
+all_data[,hcjun := ifelse(month>=7,year,year-1)]
+
 
   
