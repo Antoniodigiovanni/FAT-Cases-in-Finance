@@ -1,51 +1,32 @@
-
-#BookEquity = common equity + deferred taxes
-BookEquity <- WC03501 + WC03263
-#Earnings to Price (E/P) = earnings before extraordinary items to Price
-EtoP <- WC01551/ PCH.USD
-#Cash Flow is operat. CF
-CF <- WC04860
-#ROE = earnings before extraordinary items / Book Equity
-ROE <- WC01551/ BookEquity
-#ROA = earnings before extraordinary items / total assets
-ROA <- WC01551 / WC02999
-#GP/A = (Net Sales Revenue - COGS)/total Assets
-GPtoA <- (WC01001 - WC01051)/WC02999
-#Operating Profits to book equity = /Net Sales Rev. - COGS - Interest - Secondaries)/BookEquity
-OpPtoE <- (WC01001 - WC01051 - WC01101 - WC01251)/BookEquity
-#Change Operating WC = Change current Assets - change cash (equi) - current liabilities + change current liabilities + change income taxes payable
-DeltaOpWC <- WC0221 - WC02001 -WC03101 + WC03051 + WC03063
-
-##Grouping Required
-#Operating Accruals = Change Operating WC - depletion - total Assets, in Year y are measured via End fiscal Year Y-2 until EoFY Y-1
-OA <- DeltaOpWC - WC01551-WC02999
-
-#Operating Assets = Total Asstes - Cash (Equi)
-OA = WC02999 - WC02001
-#operating liabilities = total Assets - short&long term Debt - minority interest - prefferd stock&common equity
-OL = WC02999 - WC03255 - WC03426 - WC03995
-
-## Grouping Required
-#Net Operating Assets = (Operating Assets - Operating Liabilities, both End of fiscal Year Y-1) - total assets and EoFY Y-2
-NOA = OA - OL-WC02999
+source("Real_data_prep.R")
 
 
-###From Guest Lecture
-#Trailing Earnings Yield = Earnings per Share / Price, over Fiscal Year, EPS WC05210
-TEY <- EPS/PCH.USD
-
-#Def from guest lecture: Free Cash Flow = Net Income (WC07250)+ DDA (WC04051)+ Non-Cash items + Delta WC (WC04900)+ (Interest -capitalized interest)*(1-tax) - CapEx
-#Free Cash Flow per share = WC05507, Common shares outstanding= WC05301
-#FCF <- WC05507 * WC05301
-
-#Free Cash Flow Yield (to the Firm)=  FCF/EV
-EV <- BookEquity + NetDebt
-NetDebt <- WC03255 - WC02001 - WC02004 - WC02003
-FCFY <- FCF/EV
-
-
-# Momentum
-all_data[,hcjun := ifelse(month>=7,year,year-1)]
-
-
+factors <- all_data %>% mutate(
+  BM = (WC03501+WC03263) / (MV.June*1000),
+  BM_m = (WC03501+WC03263) / (MV*1000),
+  EP = WC03501 / (MV.June*1000 / NOSH),
+  EP_m = WC03501 / (MV*1000 / NOSH),
+  CP = WC04860 / (MV.June*1000 / NOSH),
+  CP_m = WC04860 / (MV*1000 / NOSH),
+  ROE = WC01551 / (WC03501 + WC03263),
+  ROA = (WC01551 / WC02999), 
+  GPA =  (WC01001 - WC01501) / WC02999,
+  OPBE = (WC01001 - WC01501 - WC01101 - WC01251) / (WC03501 + WC03263),
+  OA = (WC02201 - WC02001 - WC03101 + WC03051 + 
+          ifelse(WC03063=="NA",0,WC03063) - ifelse(WC01151=="NA",0,WC01151)),
+  OL = WC02999 - WC03255 - WC03426 - WC03995,
+  NOA = OA - OL - lag_total_assets,
+  AG = WC02999 / (lag_total_assets*100),
+  ItA = (WC02301 - lag_ppe + WC02101 - lag_inventories) / lag_total_assets,
+  EPS = WC05202,
+  TEY = WC05202/(MV.June / NOSH),
+  BookToEV = WC05491/WC18100,
+  DtoE = WC03255 /WC03501,
+  QuickRatio = (WC02201 - WC02101) / WC03101,
   
+) %>% 
+  select(Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, ym,
+         BM, BM_m, EP, EP_m, CP, CP_m, ROE, ROA, GPA, OPBE, OA) %>% 
+  rename(country = country.x) %>% drop_na(MV.USD.June)
+
+# Include FFtF and we use EBITDA - EBIT to get depreciation amount
