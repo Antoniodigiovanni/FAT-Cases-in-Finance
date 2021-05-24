@@ -11,10 +11,10 @@ setwd (dirname(getActiveDocumentContext()$path))
 Sys.setlocale("LC_TIME", "C")
 
 #Data from Datastream
-load("Data/FAT_monthly.RData")
-load("Data/FAT_static.RData")
+load(file.path("Data","FAT_monthly.RData"))
+load(file.path("Data","FAT_static.RData"))
 # Yearly Accounting Data from Worldscope
-load("Data/FAT_yearly.RData")
+load(file.path("Data","FAT_yearly.RData"))
 
 # Get data from year 1994 to ensure data quality
 FAT.monthly[, month := month(Date)]
@@ -68,6 +68,7 @@ all_data <- all_data %>% filter(pf.size != "Micro")
 all_data[,hcjun := ifelse(month>=7,year-1,year-2)]
 all_data <- merge(all_data, FAT.yearly, by.x = c("Id", "hcjun"), by.y = c("Id", "YEAR"),
                   all.x = T)
+
 
 
 #Construct the factors to investigate

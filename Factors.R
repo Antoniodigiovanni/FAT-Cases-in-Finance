@@ -1,3 +1,8 @@
+library(rstudioapi)
+
+# Set the working directory to the script directory
+setwd (dirname(getActiveDocumentContext()$path)) 
+
 source("Real_data_prep.R")
 
 
@@ -26,7 +31,17 @@ factors <- all_data %>% mutate(
   
 ) %>% 
   select(Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, ym,
-         BM, BM_m, EP, EP_m, CP, CP_m, ROE, ROA, GPA, OPBE, OA) %>% 
+         BM, BM_m, EP, EP_m, CP, CP_m, ROE, ROA, GPA, OPBE, OA, OL, NOA, AG, ItA,
+         EPS, TEY, BookToEV, DtoE, QuickRatio, pf.size, hcjun) %>% 
   rename(country = country.x) %>% drop_na(MV.USD.June)
 
 # Include FFtF and we use EBITDA - EBIT to get depreciation amount
+
+
+
+# Complete list of Factors passed to other scripts
+Yearly_factors_list = (c( "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
+                          "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV", 
+                          "DtoE", "QuickRatio"))
+
+Monthly_factors_list = c("CP_m", "BM_m", "EP_m")
