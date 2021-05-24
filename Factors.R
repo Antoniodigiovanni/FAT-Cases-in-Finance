@@ -65,10 +65,16 @@ factors <- all_data %>% mutate(
 
 # Include FFtF and we use EBITDA - EBIT to get depreciation amount
 
+#Momentum
+Momentum <- all_data %>% group_by(Id) %>% 
+  do(cbind(reg_col = select(., RET) %>% 
+             rollapplyr(list(seq(-12, -2)), sum, by.column = FALSE, fill = NA),
+           date_col = select(., Date))) %>% 
+  ungroup() %>% rename("Cumulative_RET" = reg_col)
 
 
 # Complete list of Factors passed to other scripts
-# Add "Beta" to the list once fixed
+# Add "Beta" to the list once fixed (now it is a list embedded in a df and errors arise from this)
 Yearly_factors_list = (c("BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
                           "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV", 
                           "DtoE", "QuickRatio"))

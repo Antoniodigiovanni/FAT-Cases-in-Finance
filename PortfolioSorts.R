@@ -10,6 +10,7 @@ setwd (dirname(getActiveDocumentContext()$path))
 
 source("Factors.R")
 
+source("FAT_RM.R")
 
 
 create_quintiles <- function(data, factor) {
@@ -24,6 +25,20 @@ create_quintiles <- function(data, factor) {
                    by.x=c("hcjun", "country"),
                    by.y=c("year", "country"))
 }
+
+create_quintiles_m <- function(data, factor) {
+  hlpvariable2 <- data[!is.na(data[[factor]]) & pf.size == "Big"] %>% 
+    group_by(country, year, month) %>% 
+    summarize(bb20 = quantile(.data[[factor]], probs = c(0.2), na.rm = T),
+              bb40 = quantile(.data[[factor]], probs = c(0.4), na.rm = T),
+              bb60 = quantile(.data[[factor]], probs = c(0.6), na.rm = T),
+              bb80 = quantile(.data[[factor]], probs = c(0.8), na.rm = T)) %>% 
+    select(month, year, country, bb20, bb40, bb60, bb80)
+  factors <- merge(data,hlpvariable2,
+                   by.x=c("hcjun", "country", "month"),
+                   by.y=c("year", "country", "month"))
+}
+
 
 # Assign each stock to the respective quintile
 create_breakpoints <- function(data, factor) {
@@ -74,9 +89,15 @@ create_portfolio_sorts <- function(data, factor, empty_df) {
   empty_df <- calculate_factor_returns(factor_return, empty_df, factor)
 }
 
+create_portfolio_sorts_monthly <- function(data, factor, empty_df) {
+  factor_return <- create_quintiles_m(data, factor)
+  factor_return <- create_breakpoints(factor_return, factor)
+  empty_df <- calculate_factor_returns(factor_return, empty_df, factor)
+} 
+
 # Create empty dataframe to display results
-cols = c("1", "2", "3", "4", "5", "5-1")
-portfolio_returns <- data.frame(matrix(nrow = 0, ncol = length(cols)))
+#cols = c("1", "2", "3", "4", "5", "5-1")
+#portfolio_returns <- data.frame(matrix(nrow = 0, ncol = length(cols)))
 
 # Exclude the stocks that have negative earnings, cash flows or gross profits
 # We start with Book-To-Market and we only consider stocks with positive BM
@@ -89,7 +110,6 @@ portfolio_returns <- data.frame(matrix(nrow = 0, ncol = length(cols)))
 # test <- calculate_factor_returns(bp, portfolio_returns, "BM")
 
 
-source("FAT_RM.R")
 
 # Filter for positive values of price ratios, ttest, alpha
 t_test = data.table()
@@ -98,6 +118,10 @@ for (f in Yearly_factors_list){
   tmp_factor <- tmp_factor %>% drop_na(!!sym(f))
   portfolio_returns <- create_portfolio_sorts(tmp_factor, f)
   t5minus1 <- unlist(t.test(portfolio_returns$`5-1`)[1])
+  
+  ps <- portfolio_returns %>% ungroup() %>% 
+    select(-Date) %>% colMeans(na.rm = T)
+  Avg <- bind_rows(Avg, ps)
   
   
   portfolio_returns$ym <-as.yearmon(portfolio_returns$Date)
@@ -110,9 +134,44 @@ for (f in Yearly_factors_list){
   tt <- data.table(f, t5minus1, Alpha, tAlpha)
   t_test <- rbind(t_test, tt)
 }
-rm(portfolio_returns)
-rm(tt)
-rm(tmp_factor)
+t_test$ID <- seq.int(nrow(t_test))
+Avg$ID <- seq.int(nrow(Avg))
+sorted_portfolios_y <- left_join(t_test,
+                                 Avg,
+                                 by='ID') %>% 
+  select(-ID)
+
+rm(portfolio_returns, tt, tmp_factor)
+
+t_test = data.table()
+Avg <- data.table()
+for (f in Monthly_factors_list){
+  tmp_factor <- factors %>% filter(!!sym(f)>0)  
+  tmp_factor <- tmp_factor %>% drop_na(!!sym(f))
+  portfolio_returns <- create_portfolio_sorts_monthly(tmp_factor, f)
+  t5minus1 <- unlist(t.test(portfolio_returns$`5-1`)[1])
+  
+  ps <- portfolio_returns %>% ungroup() %>% 
+    select(-Date) %>% colMeans(na.rm = T)
+  Avg <- bind_rows(Avg, ps)
+  
+  portfolio_returns$ym <-as.yearmon(portfolio_returns$Date)
+  portfolio_returns <- merge(portfolio_returns[,c("ym","1", "2", "3", "4", "5", "5-1")], 
+                             Market_Portfolio_FAT[,c("ym", "RMRF")], 
+                             by="ym")
+  Alpha = as.numeric(lm(`5-1`~RMRF, data = portfolio_returns)$coefficient[1])
+  #tAlpha= as.numeric(coef(summary(lm(`5-1`~RMRF, data = portfolio_returns)))[,"t value"][1])
+  tAlpha= as.numeric(summary(lm(`5-1`~RMRF, data = portfolio_returns))$coefficient[5])
+  tt <- data.table(f, t5minus1, Alpha, tAlpha)
+  t_test <- rbind(t_test, tt)
+}
+t_test$ID <- seq.int(nrow(t_test))
+Avg$ID <- seq.int(nrow(Avg))
+sorted_portfolios_m <- left_join(t_test,
+                                 Avg,
+                                 by='ID') %>% 
+  select(-ID)
 
 
-
+rm(Avg, Market_Portfolio_FAT, portfolio_returns, t_test, tmp_factor, tt, Alpha,
+   f, Monthly_factors_list, ps, t5minus1, tAlpha, Yearly_factors_list)

@@ -90,18 +90,9 @@ all_data <- merge(all_data, lag_variables, by.x = c("Id", "hcjun"), by.y = c("Id
                   all.x = T)
 
 # Beta calculation
+
+
 # Delete all unnecessary dataframes
-# momentum
-
-#test <- beta_data %>% slice(1:10000)
-#test <- FAT.monthly %>% slice(1:250000)
-#Coef <- . %>% as.data.frame %>% cumsum %>% coef
-Momentum <- all_data %>% group_by(Id) %>% 
-  do(cbind(reg_col = select(., RET) %>% 
-             rollapplyr(list(seq(-12, -2)), sum, by.column = FALSE, fill = NA),
-           date_col = select(., Date))) %>% 
-  ungroup() %>% rename("Cumulative_RET" = reg_col)
-
 # Clear memory
 rm(FAT.monthly, FAT.static, FAT.yearly, hlpvariable, lag_variables, small_static,
    micro_stocks, cols_exlude)
