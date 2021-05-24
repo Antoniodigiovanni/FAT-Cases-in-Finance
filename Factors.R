@@ -68,7 +68,8 @@ factors <- all_data %>% mutate(
 
 
 # Complete list of Factors passed to other scripts
-Yearly_factors_list = (c( "Beta", "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
+# Add "Beta" to the list once fixed
+Yearly_factors_list = (c("BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
                           "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV", 
                           "DtoE", "QuickRatio"))
 
