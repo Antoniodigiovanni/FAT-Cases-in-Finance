@@ -15,7 +15,7 @@ Beta_36_M <- Beta_36_M %>% mutate(
 
 
 
-all_data <- all_data[, Beta.year:=ifelse(month>=7, year, year-1)]
+all_data <- all_data[, Beta.year:=ifelse(month>=6, year, year-1)] # Should we update in July?
 
 # Why there are NULL values and not NA?
 all_data <- left_join(
