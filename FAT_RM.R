@@ -9,9 +9,9 @@ setwd (dirname(getActiveDocumentContext()$path))
 # Set Date Language in English
 Sys.setlocale("LC_TIME", "C")
 
-load("FAT_monthly.RData")
-load("FAT_static.RData")
-load("FAT_yearly.RData")
+load("Data/FAT_monthly.RData")
+load("Data/FAT_static.RData")
+load("Data/FAT_yearly.RData")
 
 #Calculating Total Market Cap for each month
 Monthly_Market_Cap <- data.frame(

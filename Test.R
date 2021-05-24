@@ -3,7 +3,7 @@ library(data.table)
 library(zoo)
 library(rstudioapi)
 library(tidyverse)
-library(PerfomanceAnalytcis)
+
 
 # Set the working directory to the script directory
 setwd (dirname(getActiveDocumentContext()$path)) 
@@ -105,20 +105,13 @@ for (f in Yearly_factors_list){
                              Market_Portfolio_FAT[,c("ym", "RMRF")], 
                              by="ym")
   Alpha = as.numeric(lm(`5-1`~RMRF, data = portfolio_returns)$coefficient[1])
-  tAlpha= as.numeric(lm(`5-1`~RMRF, data = portfolio_returns)$coefficient[2])
+  tAlpha= as.numeric(coef(summary(lm(`5-1`~RMRF, data = portfolio_returns)))[,"t value"][1])
   tt <- data.table(f, t5minus1, Alpha, tAlpha)
   t_test <- rbind(t_test, tt)
 }
+rm(portfolio_returns)
+rm(tt)
+rm(tmp_factor)
 
-#Alpha = lm(`5-1`~RMRF, data = portfolio_returns)#$coefficient[1]
-#print(Alpha)
-
-
-#source("FAT_RM.R")
-
-#portfolio_returns$ym <-as.yearmon(portfolio_returns$Date)
-#hlp <- filter(Market_Portfolio_FAT)
-#portfolio_returns <- merge(hlp[,c("RMRF", "ym")], 
-#                           portfolio_returns[,c("1", "2", "3", "4", "5", "5-1", "ym")], by="ym")
 
 
