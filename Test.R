@@ -1,4 +1,9 @@
 library(rstudioapi)
+library(data.table)
+library(zoo)
+library(rstudioapi)
+library(tidyverse)
+library(PerfomanceAnalytcis)
 
 # Set the working directory to the script directory
 setwd (dirname(getActiveDocumentContext()$path)) 
@@ -84,40 +89,36 @@ portfolio_returns <- data.frame(matrix(nrow = 0, ncol = length(cols)))
 # test <- calculate_factor_returns(bp, portfolio_returns, "BM")
 
 
+source("FAT_RM.R")
 
-# Filter for positive values of price ratios
+# Filter for positive values of price ratios, ttest, alpha
 t_test = data.table()
 for (f in Yearly_factors_list){
   tmp_factor <- factors %>% filter(!!sym(f)>0)  
   tmp_factor <- tmp_factor %>% drop_na(!!sym(f))
   portfolio_returns <- create_portfolio_sorts(tmp_factor, f)
-  t <- unlist(t.test(portfolio_returns$`5-1`)[1])
-  tt <- data.table(f, t)
-  t_test <- rbind(t_test, tt)
+  t5minus1 <- unlist(t.test(portfolio_returns$`5-1`)[1])
   
+  
+  portfolio_returns$ym <-as.yearmon(portfolio_returns$Date)
+  portfolio_returns <- merge(portfolio_returns[,c("ym","1", "2", "3", "4", "5", "5-1")], 
+                             Market_Portfolio_FAT[,c("ym", "RMRF")], 
+                             by="ym")
+  Alpha = as.numeric(lm(`5-1`~RMRF, data = portfolio_returns)$coefficient[1])
+  tAlpha= as.numeric(lm(`5-1`~RMRF, data = portfolio_returns)$coefficient[2])
+  tt <- data.table(f, t5minus1, Alpha, tAlpha)
+  t_test <- rbind(t_test, tt)
 }
-# # Filter out stocks with negative earnings 
-# ep_factor <- factors %>% filter(EP > 0) %>% drop_na(EP)
-# portfolio_returns <- create_portfolio_sorts(ep_factor, "EP", portfolio_returns)
-# # Filter out stocks with negative CF
-# cp_factor <- factors %>% filter(CP > 0) %>% drop_na(CP)
-# portfolio_returns <- create_portfolio_sorts(cp_factor, "CP", portfolio_returns)
-# 
-# roe_factor <- factors %>% filter(ROE > 0)
-# portfolio_returns <- create_portfolio_sorts(roe_factor, "ROE", portfolio_returns)
-# 
-# roa_factor <- factors %>% filter(ROA > 0)
-# portfolio_returns <- create_portfolio_sorts(roa_factor, "ROA", portfolio_returns)
-# 
-# gpa_factor <- factors %>% filter(GPA > 0)
-# portfolio_returns <- create_portfolio_sorts(gpa_factor, "GPA", portfolio_returns)
-# 
-# opbe_factor <- factors %>% filter(OPBE > 0)
-# portfolio_returns <- create_portfolio_sorts(opbe_factor, "OPBE", portfolio_returns)
-# 
-# oa_factor <- factors %>% drop_na(OA)
-# portfolio_returns <- create_portfolio_sorts(oa_factor, "OA", portfolio_returns)
-# 
-# colnames(portfolio_returns) <- cols
-# rows <- c("BM", "EP", "CP", "ROE", "ROA", "GP/A", "OP/BE", "OA")
-# rownames(portfolio_returns) <- rows
+
+#Alpha = lm(`5-1`~RMRF, data = portfolio_returns)#$coefficient[1]
+#print(Alpha)
+
+
+#source("FAT_RM.R")
+
+#portfolio_returns$ym <-as.yearmon(portfolio_returns$Date)
+#hlp <- filter(Market_Portfolio_FAT)
+#portfolio_returns <- merge(hlp[,c("RMRF", "ym")], 
+#                           portfolio_returns[,c("1", "2", "3", "4", "5", "5-1", "ym")], by="ym")
+
+
