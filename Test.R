@@ -105,7 +105,8 @@ for (f in Yearly_factors_list){
                              Market_Portfolio_FAT[,c("ym", "RMRF")], 
                              by="ym")
   Alpha = as.numeric(lm(`5-1`~RMRF, data = portfolio_returns)$coefficient[1])
-  tAlpha= as.numeric(coef(summary(lm(`5-1`~RMRF, data = portfolio_returns)))[,"t value"][1])
+  #tAlpha= as.numeric(coef(summary(lm(`5-1`~RMRF, data = portfolio_returns)))[,"t value"][1])
+  tAlpha= as.numeric(summary(lm(`5-1`~RMRF, data = portfolio_returns))$coefficient[5])
   tt <- data.table(f, t5minus1, Alpha, tAlpha)
   t_test <- rbind(t_test, tt)
 }
