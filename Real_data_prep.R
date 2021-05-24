@@ -24,7 +24,7 @@ FAT.monthly <- FAT.monthly %>% filter(year > 1993)
 small_static <- FAT.static %>% select(Id, INDM)
 
 all_data <- merge(FAT.monthly, small_static, by = "Id")
-table(small_static$INDM)
+#table(small_static$INDM)
 
 # Banks, Consumer Finance, FInancial Admin., Insurance Brokers, Mortgage Finance, Investment Services,
 # Specialty Finance, Venture Capital Trust, Private Equity, Real Estate Hold, Dev, Reinsurance,
@@ -34,6 +34,7 @@ cols_exlude <- c("Banks", "Consumer Finance", "Financial Admin.", "Insurance Bro
                  "Investment Services", "Specialty Finance", "Venture Capital Trust", "Private Equity",
                  "Real Estate Hold, Dev", "Reinsurance", "Life Insurance", "Asset Managers")
 
+all_data <- all_data %>% filter(!(INDM %in% cols_exlude)) %>% select(-INDM)
 
 # Following Hou et al.(2018) and excluding all micro stocks
 # Create MV.USD.June to get yearly MV that matches with yearly accounting data
@@ -74,8 +75,17 @@ all_data <- merge(all_data, FAT.yearly, by.x = c("Id", "hcjun"), by.y = c("Id", 
 #Construct the factors to investigate
 # Lag value for the monthly BM calculation
 all_data[,hcjun := ifelse(month>=7,year-2,year-3)]
-lag_variables <- FAT.yearly %>% select(Id, country, YEAR, WC02101, WC02999, WC02301) %>% 
-  rename(lag_inventories = WC02101, lag_total_assets = WC02999, lag_ppe = WC02301)
+lag_variables <- FAT.yearly %>% select(Id, country, YEAR, WC02101, WC02999, WC02301,
+                                       WC02201, WC02001, WC03101, WC03051,
+                                       WC03063) %>% 
+  rename(lag_inventories = WC02101, 
+         lag_total_assets = WC02999, 
+         lag_ppe = WC02301,
+         LWC02201 = WC02201,
+         LWC02001 = WC02001,
+         LWC03101 = WC03101,
+         LWC03051 = WC03051,
+         LWC03063 = WC03063)
 all_data <- merge(all_data, lag_variables, by.x = c("Id", "hcjun"), by.y = c("Id", "YEAR"),
                   all.x = T)
 
@@ -84,11 +94,16 @@ all_data <- merge(all_data, lag_variables, by.x = c("Id", "hcjun"), by.y = c("Id
 # momentum
 
 #test <- beta_data %>% slice(1:10000)
-test <- FAT.monthly %>% slice(1:250000)
-Coef <- . %>% as.data.frame %>% cumsum %>% coef
-coefs <- test %>% group_by(Id) %>% do(cbind(reg_col = select(., RET) %>% 
-                                                   rollapplyr(list(seq(-12, -2)), sum, by.column = FALSE, fill = NA),
-                                                 date_col = select(., Date))) %>% 
-  ungroup
+#test <- FAT.monthly %>% slice(1:250000)
+#Coef <- . %>% as.data.frame %>% cumsum %>% coef
+Momentum <- all_data %>% group_by(Id) %>% 
+  do(cbind(reg_col = select(., RET) %>% 
+             rollapplyr(list(seq(-12, -2)), sum, by.column = FALSE, fill = NA),
+           date_col = select(., Date))) %>% 
+  ungroup() %>% rename("Cumulative_RET" = reg_col)
 
-test <- FAT.monthly %>% group_by(Id) %>% do(rollapplyr(12, cumsum(RET)))
+# Clear memory
+rm(FAT.monthly, FAT.static, FAT.yearly, hlpvariable, lag_variables, small_static,
+   micro_stocks, cols_exlude)
+
+#test <- FAT.monthly %>% group_by(Id) %>% do(rollapplyr(12, cumsum(RET)))
