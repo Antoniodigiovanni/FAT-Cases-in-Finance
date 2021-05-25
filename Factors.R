@@ -5,7 +5,8 @@ setwd (dirname(getActiveDocumentContext()$path))
 
 source("Real_data_prep.R")
 
-# Merge Beta in all_data
+# Merge Beta in all_data - Correct the fact that Beta is seen as a list even
+# though it is a column in the df (comes from the original calculation)
 load("Beta_36_M.RData")
 Beta_36_M$Id <- factor(Beta_36_M$Id, levels = levels(all_data$Id))
 
@@ -70,13 +71,17 @@ Momentum <- all_data %>% group_by(Id) %>%
   do(cbind(reg_col = select(., RET) %>% 
              rollapplyr(list(seq(-12, -2)), sum, by.column = FALSE, fill = NA),
            date_col = select(., Date))) %>% 
-  ungroup() %>% rename("Cumulative_RET" = reg_col)
+  ungroup() %>% rename("Momentum" = reg_col)
 
+factors <- left_join(factors,
+                     Momentum,
+                     by=c("Id", "Date"))
 
+rm(Momentum)
 # Complete list of Factors passed to other scripts
 # Add "Beta" to the list once fixed (now it is a list embedded in a df and errors arise from this)
 Yearly_factors_list = (c("BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
                           "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV", 
                           "DtoE", "QuickRatio"))
 
-Monthly_factors_list = c("CP_m", "BM_m", "EP_m")
+Monthly_factors_list = c("CP_m", "BM_m", "EP_m", "Momentum")

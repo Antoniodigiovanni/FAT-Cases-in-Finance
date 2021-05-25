@@ -113,6 +113,7 @@ create_portfolio_sorts_monthly <- function(data, factor, empty_df) {
 
 # Filter for positive values of price ratios, ttest, alpha
 t_test = data.table()
+Avg <- data.table()
 for (f in Yearly_factors_list){
   tmp_factor <- factors %>% filter(!!sym(f)>0)  
   tmp_factor <- tmp_factor %>% drop_na(!!sym(f))
