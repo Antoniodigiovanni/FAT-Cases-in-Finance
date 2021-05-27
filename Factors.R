@@ -18,6 +18,8 @@ Beta_36_M <- Beta_36_M %>% mutate(
 
 all_data <- all_data[, Beta.year:=ifelse(month>=6, year, year-1)] # Should we update in July?
 
+
+
 # Why there are NULL values and not NA?
 all_data <- left_join(
   all_data,
@@ -27,6 +29,7 @@ all_data <- left_join(
 
 rm(Beta_36_M)
 
+# Dont we have to lag the monthly values?
 factors <- all_data %>% mutate(
   BM = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV.June*1000),
   BM_m = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV*1000),
