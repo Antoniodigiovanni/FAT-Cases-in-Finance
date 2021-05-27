@@ -34,6 +34,7 @@ rm(Beta_36_M)
 factors <- all_data %>% mutate(
   BM = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV.June*1000),
   BM_m = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (LMV*1000),
+  bm_dummy = ifelse(WC03501<0, 1, 0),
   EP = WC03501 / (MV.June*1000 / NOSH),
   EP_m = WC03501 / LMP,
   earnings_dummy = ifelse(WC03501 < 0, 1, 0),
@@ -68,7 +69,8 @@ factors <- all_data %>% mutate(
   QuickRatio = (WC02201 - WC02101) / WC03101
 ) %>% 
   select(Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, Beta, ym,
-         BM, BM_m, EP, EP_m, CP, CP_m, ROE, ROA, GPA, OPBE, OA, OL, NOA, AG, ItA,
+         BM, BM_m, bm_dummy, EP, EP_m, earnings_dummy, CP, CP_m, cashflow_dummy, ROE, ROA, GPA, profits_dummy,
+         OPBE, op_dummy, OA, OL, NOA, AG, ItA,
          EPS, TEY, BookToEV, DtoE, QuickRatio, pf.size, hcjun) %>% 
   rename(country = country.x) %>% drop_na(MV.USD.June)
 

@@ -5,6 +5,8 @@ library(tidyverse)
 library(lubridate)
 library(broom)
 
+source("Factors.R")
+
 # Set the working directory to the script directory
 setwd(dirname(getActiveDocumentContext()$path)) 
 
@@ -14,161 +16,161 @@ Sys.setlocale("LC_TIME", "C")
 # Include for dummy for negative earnings, cash flow and gross profits 
 # First test the traditional Fama/Macbeth 5 Factors
 
-cross_reg <- factors %>% select(Id, ym, RET.USD, Beta, BM, OPBE, AG, MV.USD.June, country) %>% drop_na(.) %>% 
+cross_reg <- factors %>% select(Id, ym, RET.USD, Beta, BM, bm_dummy , OPBE, op_dummy , AG, MV.USD.June, country) %>% 
+  drop_na(.) %>% 
   filter(AG != "Inf")
-CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country))$coefficient[1],
-                                    gamma=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country))$coefficient[2],
-                                    gamma.value=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country))$coefficient[3],
-                                    gamma.profitability = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country))$coefficient[4],
-                                    gamma.investment = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country))$coefficient[5],
-                                    gamma.size = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country))$coefficient[6],
+# Set negative values for OPBE to 0
+cross_reg[OPBE<0]$OPBE <- 0
+cross_reg[BM<0]$BM <- 0
+
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[1],
+                                    beta=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[2],
+                                    bm=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[3],
+                                    opbe = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[4],
+                                    ag = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[5],
+                                    size = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[6],
                                         no.obs=length(Id)),by=ym]
 
 
-CS.reg.estimtates[,t.test(gamma_zero)]
-CS.reg.estimtates[,t.test(gamma)]
-CS.reg.estimtates[,t.test(gamma.value)]
-CS.reg.estimtates[,t.test(gamma.profitability)]
-CS.reg.estimtates[,t.test(gamma.investment)]
-CS.reg.estimtates[,t.test(gamma.size)]
+ffm <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.estimates[, t.test(beta)]$statistic),
+                  BM = c(CS.reg.estimates[,t.test(bm)]$estimate, CS.reg.estimates[, t.test(bm)]$statistic),
+                  OPBE = c(CS.reg.estimates[,t.test(opbe)]$estimate, CS.reg.estimates[, t.test(opbe)]$statistic),
+                  AG = c(CS.reg.estimates[,t.test(ag)]$estimate, CS.reg.estimates[, t.test(ag)]$statistic),
+                  Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic))
+
 
 # Include Momentum to the model
-cross_reg <- factors %>% select(Id, ym, RET.USD, Beta, BM, OPBE, AG, MV.USD.June, Momentum, country) %>% drop_na(.) %>% 
+cross_reg <- factors %>% select(Id, ym, RET.USD, Beta, BM, bm_dummy, OPBE, op_dummy,
+                                AG, MV.USD.June, Momentum, country) %>% drop_na(.) %>% 
   filter(AG != "Inf")
-CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
-                                   gamma=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
-                                   gamma.value=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
-                                   gamma.profitability = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
-                                   gamma.investment = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
-                                   gamma.size = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
-                                   gamma.Mom = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
-                                   no.obs=length(Id)),by=ym]
+# Set negative values for OPBE to 0
+cross_reg[OPBE<0]$OPBE <- 0
+cross_reg[BM<0]$BM <- 0
+
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[1],
+                                  beta=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[2],
+                                  bm=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[3],
+                                  opbe = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[4],
+                                  ag = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[5],
+                                  size = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[6],
+                                  mom = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[7],
+                                  no.obs=length(Id)),by=ym]
 
 
-CS.reg.estimtates[,t.test(gamma_zero)]
-CS.reg.estimtates[,t.test(gamma)]
-CS.reg.estimtates[,t.test(gamma.value)]
-CS.reg.estimtates[,t.test(gamma.profitability)]
-CS.reg.estimtates[,t.test(gamma.investment)]
-CS.reg.estimtates[,t.test(gamma.size)]
-CS.reg.estimtates[,t.test(gamma.Mom)]
+sfm <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.estimates[, t.test(beta)]$statistic),
+                  BM = c(CS.reg.estimates[,t.test(bm)]$estimate, CS.reg.estimates[, t.test(bm)]$statistic),
+                  OPBE = c(CS.reg.estimates[,t.test(opbe)]$estimate, CS.reg.estimates[, t.test(opbe)]$statistic),
+                  AG = c(CS.reg.estimates[,t.test(ag)]$estimate, CS.reg.estimates[, t.test(ag)]$statistic),
+                  Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic),
+                  Mom = c(CS.reg.estimates[,t.test(mom)]$estimate, CS.reg.estimates[, t.test(mom)]$statistic))
 
 
 # Comparison Value Variables
 cross_reg <- factors %>% 
-  select(Id, ym, RET.USD, Beta, BM, BM_m, OPBE, AG, MV.USD.June, Momentum, country) %>% 
+  select(Id, ym, RET.USD, Beta, BM, BM_m, bm_dummy, OPBE, op_dummy, AG, MV.USD.June, Momentum, country) %>% 
   drop_na(.) %>% 
   filter(AG != "Inf")
-CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
-                                   gamma=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
-                                   gamma.value=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
-                                   gamma.value_monthly=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
-                                   gamma.profitability = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
-                                   gamma.investment = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
-                                   gamma.size = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
-                                   gamma.Mom = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
-                                   no.obs=length(Id)),by=ym]
+
+# Set negative values for OPBE to 0
+cross_reg[OPBE<0]$OPBE <- 0
+cross_reg[BM<0]$BM <- 0
+
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[1],
+                                  beta=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[2],
+                                  bm=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[3],
+                                  bm_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[4],
+                                  opbe = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[5],
+                                  ag = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[6],
+                                  size = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[7],
+                                  mom = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[8],
+                                  no.obs=length(Id)),by=ym]
 
 
-CS.reg.estimtates[,t.test(gamma_zero)]
-CS.reg.estimtates[,t.test(gamma)]
-CS.reg.estimtates[,t.test(gamma.value)]
-CS.reg.estimtates[,t.test(gamma.value_monthly)]
-CS.reg.estimtates[,t.test(gamma.profitability)]
-CS.reg.estimtates[,t.test(gamma.investment)]
-CS.reg.estimtates[,t.test(gamma.size)]
-CS.reg.estimtates[,t.test(gamma.Mom)]
+value1 <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.estimates[, t.test(beta)]$statistic),
+                  BM = c(CS.reg.estimates[,t.test(bm)]$estimate, CS.reg.estimates[, t.test(bm)]$statistic),
+                  BM_M = c(CS.reg.estimates[,t.test(bm_m)]$estimate, CS.reg.estimates[, t.test(bm_m)]$statistic),
+                  OPBE = c(CS.reg.estimates[,t.test(opbe)]$estimate, CS.reg.estimates[, t.test(opbe)]$statistic),
+                  AG = c(CS.reg.estimates[,t.test(ag)]$estimate, CS.reg.estimates[, t.test(ag)]$statistic),
+                  Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic),
+                  Mom = c(CS.reg.estimates[,t.test(mom)]$estimate, CS.reg.estimates[, t.test(mom)]$statistic))
 
+# Need monthly book to market dummy variable
 cross_reg <- factors %>% 
-  select(Id, ym, RET.USD, Beta, BM, BM_m, EP_m, CP_m, OPBE, AG, MV.USD.June, Momentum, country) %>% 
+  select(Id, ym, RET.USD, Beta, BM_m, EP_m, earnings_dummy, CP_m, cashflow_dummy,
+         OPBE, op_dummy, AG, MV.USD.June, Momentum, country) %>% 
   drop_na(.) %>% 
-  filter(AG != "Inf")
-CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
-                                   gamma=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
-                                   gamma.bm_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
-                                   gamma.ep_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
-                                   gamma.cp_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
-                                   gamma.profitability = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
-                                   gamma.investment = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
-                                   gamma.size = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
-                                   gamma.Mom = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[9],
-                                   no.obs=length(Id)),by=ym]
+  filter(AG != "Inf") %>% mutate(bm_dummy = ifelse(BM_m < 0, 1, 0))
+
+cross_reg[OPBE<0]$OPBE <- 0
+cross_reg[BM_m<0]$BM_m <- 0
+cross_reg[EP_m<0]$EP_m <- 0
+cross_reg[CP_m<0]$CP_m <- 0
+
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[1],
+                                  beta=lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[2],
+                                  bm_m=lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[3],
+                                  ep_m=lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[4],
+                                  cp_m=lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[5],
+                                  opbe=lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[6],
+                                  ag=lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[7],
+                                  size=lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[8],
+                                  mom = lm(RET.USD~Beta+BM_m+EP_m+CP_m+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy)$coefficient[9],
+                                  no.obs=length(Id)),by=ym]
 
 
-CS.reg.estimtates[,t.test(gamma_zero)]
-CS.reg.estimtates[,t.test(gamma)]
-CS.reg.estimtates[,t.test(gamma.bm_m)]
-CS.reg.estimtates[,t.test(gamma.ep_m)]
-CS.reg.estimtates[,t.test(gamma.cp_m)]
-CS.reg.estimtates[,t.test(gamma.profitability)]
-CS.reg.estimtates[,t.test(gamma.investment)]
-CS.reg.estimtates[,t.test(gamma.size)]
-CS.reg.estimtates[,t.test(gamma.Mom)]
+value2 <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.estimates[, t.test(beta)]$statistic),
+                     BM_M = c(CS.reg.estimates[,t.test(bm_m)]$estimate, CS.reg.estimates[, t.test(bm_m)]$statistic),
+                     EP_M = c(CS.reg.estimates[,t.test(ep_m)]$estimate, CS.reg.estimates[, t.test(ep_m)]$statistic),
+                     CP_M = c(CS.reg.estimates[,t.test(cp_m)]$estimate, CS.reg.estimates[, t.test(cp_m)]$statistic),
+                     OPBE = c(CS.reg.estimates[,t.test(opbe)]$estimate, CS.reg.estimates[, t.test(opbe)]$statistic),
+                     AG = c(CS.reg.estimates[,t.test(ag)]$estimate, CS.reg.estimates[, t.test(ag)]$statistic),
+                     Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic),
+                     Mom = c(CS.reg.estimates[,t.test(mom)]$estimate, CS.reg.estimates[, t.test(mom)]$statistic))
 
 # Comparison Profitability Variables
+# Can OA be negative?
 cross_reg <- factors %>% 
-  select(Id, ym, RET.USD, Beta, BM_m, EP_m, CP_m, GPA, OPBE, NOA, OA, AG, MV.USD.June, Momentum, country) %>% 
+  select(Id, ym, RET.USD, Beta, BM_m, EP_m, earnings_dummy,
+         CP_m, cashflow_dummy, GPA, profits_dummy, OPBE, op_dummy, NOA, OA, AG, MV.USD.June, Momentum, country) %>% 
   drop_na(.) %>% 
-  filter(AG != "Inf")
-CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
-                                   gamma=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
-                                   gamma.bm_m=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
-                                   gamma.ep_m=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
-                                   gamma.cp_m=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
-                                   gamma.gpa = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
-                                   gamma.opbe = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
-                                   gamma.noa = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
-                                   gamma.oa = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[9],
-                                   gamma.investment = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[10],
-                                   gamma.size = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[11],
-                                   gamma.Mom = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[12],
-                                   no.obs=length(Id)),by=ym]
+  filter(AG != "Inf") %>% mutate(bm_dummy = ifelse(BM_m < 0, 1, 0))
+
+cross_reg[OPBE<0]$OPBE <- 0
+cross_reg[BM_m<0]$BM_m <- 0
+cross_reg[EP_m<0]$EP_m <- 0
+cross_reg[CP_m<0]$CP_m <- 0
+cross_reg[GPA<0]$GPA <- 0
+
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[1],
+                                  beta=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[2],
+                                  bm_m=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[3],
+                                  ep_m=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[4],
+                                  cp_m=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[5],
+                                  gpa=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[6],
+                                  opbe=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[7],
+                                  noa=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[8],
+                                  oa=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[9],
+                                  ag=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[10],
+                                  size=lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[11],
+                                  mom = lm(RET.USD~Beta+BM_m+EP_m+CP_m+GPA+OPBE+NOA+OA+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy+earnings_dummy+cashflow_dummy+profits_dummy)$coefficient[12],
+                                  no.obs=length(Id)),by=ym]
+
+profitability <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.estimates[, t.test(beta)]$statistic),
+                     BM_M = c(CS.reg.estimates[,t.test(bm_m)]$estimate, CS.reg.estimates[, t.test(bm_m)]$statistic),
+                     EP_M = c(CS.reg.estimates[,t.test(ep_m)]$estimate, CS.reg.estimates[, t.test(ep_m)]$statistic),
+                     CP_M = c(CS.reg.estimates[,t.test(cp_m)]$estimate, CS.reg.estimates[, t.test(cp_m)]$statistic),
+                     GPA = c(CS.reg.estimates[,t.test(gpa)]$estimate, CS.reg.estimates[, t.test(gpa)]$statistic),
+                     OPBE = c(CS.reg.estimates[,t.test(opbe)]$estimate, CS.reg.estimates[, t.test(opbe)]$statistic),
+                     NOA = c(CS.reg.estimates[,t.test(noa)]$estimate, CS.reg.estimates[, t.test(noa)]$statistic),
+                     OA = c(CS.reg.estimates[,t.test(oa)]$estimate, CS.reg.estimates[, t.test(oa)]$statistic),
+                     AG = c(CS.reg.estimates[,t.test(ag)]$estimate, CS.reg.estimates[, t.test(ag)]$statistic),
+                     Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic),
+                     Mom = c(CS.reg.estimates[,t.test(mom)]$estimate, CS.reg.estimates[, t.test(mom)]$statistic))
 
 
-CS.reg.estimtates[,t.test(gamma_zero)]
-CS.reg.estimtates[,t.test(gamma)]
-CS.reg.estimtates[,t.test(gamma.bm_m)]
-CS.reg.estimtates[,t.test(gamma.ep_m)]
-CS.reg.estimtates[,t.test(gamma.cp_m)]
-CS.reg.estimtates[,t.test(gamma.gpa)]
-CS.reg.estimtates[,t.test(gamma.opbe)]
-CS.reg.estimtates[,t.test(gamma.noa)]
-CS.reg.estimtates[,t.test(gamma.oa)]
-CS.reg.estimtates[,t.test(gamma.investment)]
-CS.reg.estimtates[,t.test(gamma.size)]
-CS.reg.estimtates[,t.test(gamma.mom)]
 
 # Comparison Investment Variables
-cross_reg <- factors %>% 
-  select(Id, ym, RET.USD, Beta, BM_m, EP_m, CP_m, GPA, NOA, AG, ItA, MV.USD.June, Momentum, country) %>% 
-  drop_na(.) %>% 
-  filter(AG != "Inf")
-CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
-                                   gamma=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
-                                   gamma.bm_m=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
-                                   gamma.ep_m=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
-                                   gamma.cp_m=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
-                                   gamma.gpa = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
-                                   gamma.noa = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
-                                   gamma.oa = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
-                                   gamma.ag = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[9],
-                                   gamma.ItA = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[10],
-                                   gamma.size = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[11],
-                                   gamma.Mom = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[12],
-                                   no.obs=length(Id)),by=ym]
 
-
-CS.reg.estimtates[,t.test(gamma_zero)]
-CS.reg.estimtates[,t.test(gamma)]
-CS.reg.estimtates[,t.test(gamma.bm_m)]
-CS.reg.estimtates[,t.test(gamma.ep_m)]
-CS.reg.estimtates[,t.test(gamma.cp_m)]
-CS.reg.estimtates[,t.test(gamma.gpa)]
-CS.reg.estimtates[,t.test(gamma.noa)]
-CS.reg.estimtates[,t.test(gamma.ag)]
-CS.reg.estimtates[,t.test(gamma.ItA)]
-CS.reg.estimtates[,t.test(gamma.size)]
-CS.reg.estimtates[,t.test(gamma.mom)]
 
 # Strongest EM Variables
 
