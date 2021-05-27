@@ -14,7 +14,8 @@ Beta_36_M <- Beta_36_M %>% mutate(
   Beta.year = year(ym)
 ) %>% select(-ym)
 
-
+Beta_36_M$Beta <- unlist(Beta_36_M$Beta)
+Beta_36_M$Id <- unlist(Beta_36_M$Id)
 
 all_data <- all_data[, Beta.year:=ifelse(month>=6, year, year-1)] # Should we update in July?
 
