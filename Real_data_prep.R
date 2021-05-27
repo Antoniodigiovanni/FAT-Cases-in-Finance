@@ -70,6 +70,10 @@ all_data[,hcjun := ifelse(month>=7,year-1,year-2)]
 all_data <- merge(all_data, FAT.yearly, by.x = c("Id", "hcjun"), by.y = c("Id", "YEAR"),
                   all.x = T)
 
+# Lag monthly variables
+all_data[, LMV.USD := shift(MV.USD, 1L), by=Id]
+all_data[, LMV := shift(MV, 1L), by=Id]
+all_data[, LMP := shift(UP, 1L), by=Id]
 
 
 #Construct the factors to investigate

@@ -11,8 +11,9 @@ setwd(dirname(getActiveDocumentContext()$path))
 # Set Date Language in English
 Sys.setlocale("LC_TIME", "C")
 
-# Do we have to use dummy variables for negative earnings or are they not included anyway?
+# Include for dummy for negative earnings, cash flow and gross profits 
 # First test the traditional Fama/Macbeth 5 Factors
+
 cross_reg <- factors %>% select(Id, ym, RET.USD, Beta, BM, OPBE, AG, MV.USD.June, country) %>% drop_na(.) %>% 
   filter(AG != "Inf")
 CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country))$coefficient[1],
@@ -50,7 +51,7 @@ CS.reg.estimtates[,t.test(gamma.value)]
 CS.reg.estimtates[,t.test(gamma.profitability)]
 CS.reg.estimtates[,t.test(gamma.investment)]
 CS.reg.estimtates[,t.test(gamma.size)]
-CS.reg.estimtates[,t.test(gamma.mom)]
+CS.reg.estimtates[,t.test(gamma.Mom)]
 
 
 # Comparison Value Variables
@@ -76,7 +77,7 @@ CS.reg.estimtates[,t.test(gamma.value_monthly)]
 CS.reg.estimtates[,t.test(gamma.profitability)]
 CS.reg.estimtates[,t.test(gamma.investment)]
 CS.reg.estimtates[,t.test(gamma.size)]
-CS.reg.estimtates[,t.test(gamma.mom)]
+CS.reg.estimtates[,t.test(gamma.Mom)]
 
 cross_reg <- factors %>% 
   select(Id, ym, RET.USD, Beta, BM, BM_m, EP_m, CP_m, OPBE, AG, MV.USD.June, Momentum, country) %>% 
@@ -89,7 +90,7 @@ CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV
                                    gamma.cp_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
                                    gamma.profitability = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
                                    gamma.investment = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
-                                   gamma.size = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Moonmentum+as.factor(country))$coefficient[8],
+                                   gamma.size = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
                                    gamma.Mom = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[9],
                                    no.obs=length(Id)),by=ym]
 
@@ -102,25 +103,25 @@ CS.reg.estimtates[,t.test(gamma.cp_m)]
 CS.reg.estimtates[,t.test(gamma.profitability)]
 CS.reg.estimtates[,t.test(gamma.investment)]
 CS.reg.estimtates[,t.test(gamma.size)]
-CS.reg.estimtates[,t.test(gamma.mom)]
+CS.reg.estimtates[,t.test(gamma.Mom)]
 
 # Comparison Profitability Variables
 cross_reg <- factors %>% 
   select(Id, ym, RET.USD, Beta, BM_m, EP_m, CP_m, GPA, OPBE, NOA, OA, AG, MV.USD.June, Momentum, country) %>% 
   drop_na(.) %>% 
   filter(AG != "Inf")
-CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
-                                   gamma=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
-                                   gamma.bm_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
-                                   gamma.ep_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
-                                   gamma.cp_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
-                                   gamma.gpa = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
-                                   gamma.opbe = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
-                                   gamma.noa = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
-                                   gamma.oa = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[9],
-                                   gamma.investment = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[10],
-                                   gamma.size = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Moonmentum+as.factor(country))$coefficient[11],
-                                   gamma.Mom = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[12],
+CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
+                                   gamma=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
+                                   gamma.bm_m=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
+                                   gamma.ep_m=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
+                                   gamma.cp_m=lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
+                                   gamma.gpa = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
+                                   gamma.opbe = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
+                                   gamma.noa = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
+                                   gamma.oa = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[9],
+                                   gamma.investment = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[10],
+                                   gamma.size = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[11],
+                                   gamma.Mom = lm(RET.USD~Beta+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[12],
                                    no.obs=length(Id)),by=ym]
 
 
@@ -142,18 +143,18 @@ cross_reg <- factors %>%
   select(Id, ym, RET.USD, Beta, BM_m, EP_m, CP_m, GPA, NOA, AG, ItA, MV.USD.June, Momentum, country) %>% 
   drop_na(.) %>% 
   filter(AG != "Inf")
-CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
-                                   gamma=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
-                                   gamma.bm_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
-                                   gamma.ep_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
-                                   gamma.cp_m=lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
-                                   gamma.gpa = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
-                                   gamma.noa = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
-                                   gamma.oa = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
-                                   gamma.ag = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[9],
-                                   gamma.ItA = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[10],
-                                   gamma.size = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Moonmentum+as.factor(country))$coefficient[11],
-                                   gamma.Mom = lm(RET.USD~Beta+BM+BM_m+OPBE+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[12],
+CS.reg.estimtates <- cross_reg[, .(gamma_zero=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[1],
+                                   gamma=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[2],
+                                   gamma.bm_m=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[3],
+                                   gamma.ep_m=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[4],
+                                   gamma.cp_m=lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[5],
+                                   gamma.gpa = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[6],
+                                   gamma.noa = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[7],
+                                   gamma.oa = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[8],
+                                   gamma.ag = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[9],
+                                   gamma.ItA = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[10],
+                                   gamma.size = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[11],
+                                   gamma.Mom = lm(RET.USD~Beta+BM_m+AG+MV.USD.June+Momentum+as.factor(country))$coefficient[12],
                                    no.obs=length(Id)),by=ym]
 
 

@@ -8,7 +8,7 @@ source("Real_data_prep.R")
 # Merge Beta in all_data - Correct the fact that Beta is seen as a list even
 # though it is a column in the df (comes from the original calculation)
 load("Beta_36_M.RData")
-Beta_36_M$Id <- factor(Beta_36_M$Id, levels = levels(all_data$Id))
+#Beta_36_M$Id <- factor(Beta_36_M$Id, levels = levels(all_data$Id))
 
 Beta_36_M <- Beta_36_M %>% mutate(
   Beta.year = year(ym)
@@ -33,16 +33,20 @@ rm(Beta_36_M)
 # Dont we have to lag the monthly values?
 factors <- all_data %>% mutate(
   BM = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV.June*1000),
-  BM_m = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV*1000),
+  BM_m = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (LMV*1000),
   EP = WC03501 / (MV.June*1000 / NOSH),
-  EP_m = WC03501 / (MV*1000 / NOSH),
+  EP_m = WC03501 / LMP,
+  earnings_dummy = ifelse(WC03501 < 0, 1, 0),
   CP = WC04860 / (MV.June*1000 / NOSH),
-  CP_m = WC04860 / (MV*1000 / NOSH),
+  CP_m = WC04860 / LMP,
+  cashflow_dummy = ifelse(WC04860 < 0, 1, 0),
   ROE = WC01551 / (WC03501 + ifelse(is.na(WC03263),0,WC03263)),
   ROA = (WC01551 / WC02999), 
   GPA =  (WC01001 - WC01501) / WC02999,
-  OPBE = (ifelse(!is.na(WC01001) | !is.na(WC01051)| !is.na(WC01101) | !is.na(WC01251),
+  profits_dummy = ifelse((WC01001 - WC01501) < 0, 1, 0),
+  OPBE = (ifelse(!is.na(WC01051)| !is.na(WC01101) | !is.na(WC01251),
                  ifelse(is.na(WC01001),0,WC01001) - ifelse(is.na(WC01051),0,WC01051) - ifelse(is.na(WC01101),0,WC01101) - ifelse(is.na(WC01251),0,WC01251) / (WC03501 + ifelse(is.na(WC03263),0,WC03263)),NA)),
+  op_dummy = ifelse(WC01001 - ifelse(is.na(WC01051),0,WC01051) - ifelse(is.na(WC01101),0,WC01101) - ifelse(is.na(WC01251),0,WC01251) < 0, 1, 0),
   # Deflated means divided or subtracted?
   OA = ((((WC02201 - LWC02201) - (WC02001 - LWC02001) - (WC03101 - LWC03101) + 
            (WC03051 - LWC03051) + ifelse(!is.na(WC03063) & !is.na(LWC03063),
