@@ -71,50 +71,6 @@ rm(FF)
 
 #### Beta Calculation ####
 
-# We start in 1994
-Market_Portfolio <- Market_Portfolio %>% filter(ym >= "Jan 1994")
-beta_data <- FAT.monthly %>% filter(ym >= "Jan 1994" & !is.na(RET.USD)) %>% 
-  select(Id, country, Date, MV.USD, RET.USD, ym)
-
-beta_data <- merge(beta_data, Market_Portfolio,
-                   by.x = c("country", "ym"),
-                   by.y = c("Country", "ym"))
-
-# We only include stocks that have more than 36 months of data because we are using 36M rolling window approach
-M36_Data <- beta_data %>% group_by(Id) %>% summarize(count = n()) %>% filter(count >= 36)
-beta_data <- merge(beta_data, M36_Data, by = "Id")
-
-#coefs <- beta_data %>% group_by(Id) %>% rollapply(beta_data, width = 36, 
-                                                  #FUN = function(z) coef(lm(RET.USD~RMRF, data = beta_data)),
-                                                  #by.column = FALSE, align = "right")
-#beta_data$year <- floor_date(beta_data$Date, "3year")
-
-#test <- beta_data %>% slice(1:10000)
-Coef <- . %>% as.data.frame %>% lm %>% coef
-coefs <- beta_data %>% group_by(Id) %>% do(cbind(reg_col = select(., RET.USD, RMRF) %>% 
-                                              rollapplyr(36, Coef, by.column = FALSE, fill = NA),
-                                            date_col = select(., Date))) %>% 
-  ungroup
-
-
-
-
-## Rollapply Function (NOT WORKING)
-# beta.regr <- function(x) {
-#   if (sum(complete.cases(x)) >= 12) coef(lm(RET.USD ~ RMRF, data = as.data.frame(x))) else c(NA, NA)
-# }
-# 
-# 
-# test <- rollapply(
-#   data = dataset,
-#   36,
-#   by = 12,
-#   beta.regr,
-#   fill=NA,
-#   by.column = FALSE
-# )
-
-
 #### Test with multiple IDs in a for loop #####
 
 Beta_Regr <- data.table(
@@ -176,19 +132,5 @@ Beta_36_M$Id <- factor(Beta_36_M$Id, levels = levels(FAT.monthly$Id))
 
 #save(Beta_36_M, file = "Beta_36_M.RData")
 
-##### Merge Betas into FAT.Monthly ####
-Beta_36_M <- Beta_36_M %>% mutate(
-  Beta.year = year(ym)
-) %>% select(-ym)
 
-
-FAT.monthly[, month := month(Date)]
-FAT.monthly[, year := year(Date)]
-FAT.monthly[, Beta.year:=ifelse(month>=6, year, year-1)]
-
-Test <- left_join(
-  FAT.monthly,
-  Beta_36_M,
-  by = c("Id","Beta.year")
-)
 

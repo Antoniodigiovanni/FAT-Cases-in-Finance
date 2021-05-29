@@ -83,6 +83,26 @@ calculate_factor_returns <- function(data, empty_df, factor) {
   #empty_df
 }
 
+calculate_equal_factor_returns <- function(data, empty_df, factor) {
+  
+  namekey <- c(Big = "5", LessBig = "4", Neutral = "3", 
+               LessSmall = "2", Small = "1", hedge.pf = "5-1", Date = "Date")
+  portfolio_returns <- data[!is.na(pf.bm) & !is.na(RET.USD)] %>% # Some stocks are delisted but keep values from the prev fiscal y (dropping)
+    group_by(Date, pf.bm) %>%                               
+    summarize(ret.port = mean(RET.USD)) %>%
+    spread(pf.bm, ret.port) %>% mutate(hedge.pf = Big - Small) # %>% 
+  names(portfolio_returns) <- namekey[names(portfolio_returns)]
+  
+  portfolio_returns <- portfolio_returns %>% 
+    #rename("5" = Big, "4" = LessBig, "3" = Neutral,"2" = LessSmall, "1" =  Small, "5-1" = hedge.pf) %>%
+    select(Date, contains("1"), contains("2"), contains("3"), contains("4"), 
+           contains("5"), contains("5-1"))
+  #portfolio_returns <- as.data.table(portfolio_returns)
+  #factor_returns <- colSums(portfolio_returns[,2:7], na.rm = T) / nrow(portfolio_returns)
+  #empty_df <- rbind(empty_df, factor_returns)
+  #empty_df
+}
+
 create_portfolio_sorts <- function(data, factor, empty_df) {
   factor_return <- create_quintiles(data, factor)
   factor_return <- create_breakpoints(factor_return, factor)
@@ -94,6 +114,19 @@ create_portfolio_sorts_monthly <- function(data, factor, empty_df) {
   factor_return <- create_breakpoints(factor_return, factor)
   empty_df <- calculate_factor_returns(factor_return, empty_df, factor)
 } 
+
+create_equal_portfolio_sorts <- function(data, factor, empty_df) {
+  factor_return <- create_quintiles(data, factor)
+  factor_return <- create_breakpoints(factor_return, factor)
+  empty_df <- calculate_equal_factor_returns(factor_return, empty_df, factor)
+}
+
+create_equal_portfolio_sorts_monthly <- function(data, factor, empty_df) {
+  factor_return <- create_quintiles_m(data, factor)
+  factor_return <- create_breakpoints(factor_return, factor)
+  empty_df <- calculate_equal_factor_returns(factor_return, empty_df, factor)
+} 
+
 
 # Create empty dataframe to display results
 #cols = c("1", "2", "3", "4", "5", "5-1")
@@ -172,6 +205,70 @@ sorted_portfolios_m <- left_join(t_test,
                                  Avg,
                                  by='ID') %>% 
   select(-ID)
+
+# Equal Weighted Portfolios
+t_test = data.table()
+Avg <- data.table()
+for (f in Yearly_factors_list){
+  tmp_factor <- factors %>% filter(!!sym(f)>0)  
+  tmp_factor <- tmp_factor %>% drop_na(!!sym(f))
+  portfolio_returns <- create_equal_portfolio_sorts(tmp_factor, f)
+  t5minus1 <- unlist(t.test(portfolio_returns$`5-1`)[1])
+  
+  ps <- portfolio_returns %>% ungroup() %>% 
+    select(-Date) %>% colMeans(na.rm = T)
+  Avg <- bind_rows(Avg, ps)
+  
+  
+  portfolio_returns$ym <-as.yearmon(portfolio_returns$Date)
+  portfolio_returns <- merge(portfolio_returns[,c("ym","1", "2", "3", "4", "5", "5-1")], 
+                             Market_Portfolio_FAT[,c("ym", "RMRF")], 
+                             by="ym")
+  Alpha = as.numeric(lm(`5-1`~RMRF, data = portfolio_returns)$coefficient[1])
+  #tAlpha= as.numeric(coef(summary(lm(`5-1`~RMRF, data = portfolio_returns)))[,"t value"][1])
+  tAlpha= as.numeric(summary(lm(`5-1`~RMRF, data = portfolio_returns))$coefficient[5])
+  tt <- data.table(f, t5minus1, Alpha, tAlpha)
+  t_test <- rbind(t_test, tt)
+}
+t_test$ID <- seq.int(nrow(t_test))
+Avg$ID <- seq.int(nrow(Avg))
+sorted_equal_portfolios_y <- left_join(t_test,
+                                 Avg,
+                                 by='ID') %>% 
+  select(-ID)
+
+rm(portfolio_returns, tt, tmp_factor)
+
+t_test = data.table()
+Avg <- data.table()
+for (f in Monthly_factors_list){
+  tmp_factor <- factors %>% filter(!!sym(f)>0)  
+  tmp_factor <- tmp_factor %>% drop_na(!!sym(f))
+  portfolio_returns <- create_equal_portfolio_sorts_monthly(tmp_factor, f)
+  t5minus1 <- unlist(t.test(portfolio_returns$`5-1`)[1])
+  
+  ps <- portfolio_returns %>% ungroup() %>% 
+    select(-Date) %>% colMeans(na.rm = T)
+  Avg <- bind_rows(Avg, ps)
+  
+  portfolio_returns$ym <-as.yearmon(portfolio_returns$Date)
+  portfolio_returns <- merge(portfolio_returns[,c("ym","1", "2", "3", "4", "5", "5-1")], 
+                             Market_Portfolio_FAT[,c("ym", "RMRF")], 
+                             by="ym")
+  Alpha = as.numeric(lm(`5-1`~RMRF, data = portfolio_returns)$coefficient[1])
+  #tAlpha= as.numeric(coef(summary(lm(`5-1`~RMRF, data = portfolio_returns)))[,"t value"][1])
+  tAlpha= as.numeric(summary(lm(`5-1`~RMRF, data = portfolio_returns))$coefficient[5])
+  tt <- data.table(f, t5minus1, Alpha, tAlpha)
+  t_test <- rbind(t_test, tt)
+}
+t_test$ID <- seq.int(nrow(t_test))
+Avg$ID <- seq.int(nrow(Avg))
+sorted_equal_portfolios_m <- left_join(t_test,
+                                 Avg,
+                                 by='ID') %>% 
+  select(-ID)
+
+
 
 
 rm(Avg, Market_Portfolio_FAT, portfolio_returns, t_test, tmp_factor, tt, Alpha,

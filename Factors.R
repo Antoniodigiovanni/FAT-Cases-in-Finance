@@ -35,6 +35,7 @@ factors <- all_data %>% mutate(
   BM = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV.June*1000),
   BM_m = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (LMV*1000),
   bm_dummy = ifelse(WC03501<0, 1, 0),
+  bm_m_dummy = ifelse(BM_m < 0, 1, 0),
   EP = WC03501 / (MV.June*1000 / NOSH),
   EP_m = WC03501 / LMP,
   earnings_dummy = ifelse(WC03501 < 0, 1, 0),
@@ -57,40 +58,46 @@ factors <- all_data %>% mutate(
     #       ifelse(WC03063=="NA",0,WC03063) - ifelse(WC01151=="NA",0,WC01151)),
   OL = WC02999 - WC03255 - WC03426 - WC03995,
   NOA = ((WC02999 - WC02001) - OL)/lag_total_assets,
+  noa_dummy = ifelse(NOA<0, 1, 0),
+  oa_dummy = ifelse(OA<0, 1, 0),
   #NOA = OA - OL - lag_total_assets,
   AG = ((WC02999 / lag_total_assets)-1)*100,
   # NSI =
   # CEI = To calculate
   ItA = (WC02301 - lag_ppe + WC02101 - lag_inventories) / lag_total_assets,
   EPS = WC05202,
+  eps_dummy = ifelse(WC05202<0, 1, 0),
   TEY = WC05202/(MV.June / NOSH),
+  tey_dummy = ifelse(TEY<0, 1, 0),
   BookToEV = WC05491/WC18100,
   DtoE = WC03255 /WC03501,
   QuickRatio = (WC02201 - WC02101) / WC03101
 ) %>% 
   select(Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, Beta, ym,
-         BM, BM_m, bm_dummy, EP, EP_m, earnings_dummy, CP, CP_m, cashflow_dummy, ROE, ROA, GPA, profits_dummy,
+         BM, BM_m, bm_dummy, bm_m_dummy, EP, EP_m, earnings_dummy, CP, CP_m, cashflow_dummy, ROE, ROA, GPA, profits_dummy,
          OPBE, op_dummy, OA, OL, NOA, AG, ItA,
-         EPS, TEY, BookToEV, DtoE, QuickRatio, pf.size, hcjun) %>% 
+         EPS, eps_dummy, TEY, tey_dummy, BookToEV, DtoE, QuickRatio, noa_dummy, oa_dummy, pf.size, hcjun) %>% 
   rename(country = country.x) %>% drop_na(MV.USD.June)
 
 # Include FFtF and we use EBITDA - EBIT to get depreciation amount
 
 #Momentum
-Momentum <- all_data %>% group_by(Id) %>% 
-  do(cbind(reg_col = select(., RET) %>% 
-             rollapplyr(list(seq(-12, -2)), sum, by.column = FALSE, fill = NA),
+Momentum <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>% 
+  do(cbind(reg_col = select(., RET.adj) %>% 
+             rollapplyr(list(seq(-12, -2)), prod, by.column = FALSE, fill = NA),
            date_col = select(., Date))) %>% 
   ungroup() %>% rename("Momentum" = reg_col)
+
+Momentum <- Momentum %>% mutate(Momentum = (Momentum-1)*100)
 
 factors <- left_join(factors,
                      Momentum,
                      by=c("Id", "Date"))
 
-rm(Momentum)
+#rm(Momentum)
 # Complete list of Factors passed to other scripts
 # Add "Beta" to the list once fixed (now it is a list embedded in a df and errors arise from this)
-Yearly_factors_list = (c("BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
+Yearly_factors_list = (c("Beta", "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
                           "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV", 
                           "DtoE", "QuickRatio"))
 

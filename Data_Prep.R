@@ -322,3 +322,31 @@ portfolio_returns <- create_portfolio_sorts(oa_factor, "OA", portfolio_returns)
 colnames(portfolio_returns) <- cols
 rows <- c("BM", "EP", "CP", "ROE", "ROA", "GP/A", "OP/BE", "OA")
 rownames(portfolio_returns) <- rows
+
+
+# We start in 1994
+Market_Portfolio <- Market_Portfolio %>% filter(ym >= "Jan 1994")
+beta_data <- FAT.monthly %>% filter(ym >= "Jan 1994" & !is.na(RET.USD)) %>% 
+  select(Id, country, Date, MV.USD, RET.USD, ym)
+
+beta_data <- merge(beta_data, Market_Portfolio,
+                   by.x = c("country", "ym"),
+                   by.y = c("Country", "ym"))
+
+# We only include stocks that have more than 36 months of data because we are using 36M rolling window approach
+M36_Data <- beta_data %>% group_by(Id) %>% summarize(count = n()) %>% filter(count >= 36)
+beta_data <- merge(beta_data, M36_Data, by = "Id")
+
+#coefs <- beta_data %>% group_by(Id) %>% rollapply(beta_data, width = 36, 
+#FUN = function(z) coef(lm(RET.USD~RMRF, data = beta_data)),
+#by.column = FALSE, align = "right")
+#beta_data$year <- floor_date(beta_data$Date, "3year")
+
+#test <- beta_data %>% slice(1:10000)
+Coef <- . %>% as.data.frame %>% lm %>% coef
+coefs <- beta_data %>% group_by(Id) %>% do(cbind(reg_col = select(., RET.USD, RMRF) %>% 
+                                                   rollapplyr(36, Coef, by.column = FALSE, fill = NA),
+                                                 date_col = select(., Date))) %>% 
+  ungroup
+
+
