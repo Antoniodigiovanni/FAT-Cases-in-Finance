@@ -103,3 +103,20 @@ Yearly_factors_list = (c("Beta", "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", 
                           "DtoE", "QuickRatio", "NSI"))
 
 Monthly_factors_list = c("CP_m", "BM_m", "EP_m", "Momentum")
+
+
+
+
+# Calculating the correlation matrix of factors
+
+Correlation_Matrix <- factors %>% select(-Id,-Date,-country,-month,-year,
+                                         -bm_dummy,-bm_m_dummy,-earnings_dummy,
+                                         -cashflow_dummy,-profits_dummy,-op_dummy,
+                                         eps_dummy,tey_dummy,-noa_dummy,-pf.size,
+                                         -oa_dummy,-hcjun,-ym, -eps_dummy)
+
+cor <- cor(Correlation_Matrix, use = "na.or.complete")
+as.data.table(cor) -> cor
+
+
+rm(cor, Correlation_Matrix)
