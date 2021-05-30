@@ -73,9 +73,8 @@ factors <- all_data %>% mutate(
   DtoE = WC03255 /WC03501,
   QuickRatio = (WC02201 - WC02101) / WC03101,
   NSI=adjustedEquity-lagAdjustedEquity
-  
 ) %>% 
-  select(Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, Beta, ym,
+  select(Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, RET, Beta, ym,
          BM, BM_m, bm_dummy, bm_m_dummy, EP, EP_m, earnings_dummy, CP, CP_m, cashflow_dummy, ROE, ROA, GPA, profits_dummy,
          OPBE, op_dummy, OA, OL, NOA, AG, ItA, NSI,
          EPS, eps_dummy, TEY, tey_dummy, BookToEV, DtoE, QuickRatio, noa_dummy, oa_dummy, pf.size, hcjun) %>% 
@@ -96,7 +95,7 @@ factors <- left_join(factors,
                      Momentum,
                      by=c("Id", "Date"))
 
-#rm(Momentum)
+rm(Momentum)
 # Complete list of Factors passed to other scripts
 # Add "Beta" to the list once fixed (now it is a list embedded in a df and errors arise from this)
 Yearly_factors_list = (c("Beta", "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
