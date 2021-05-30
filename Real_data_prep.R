@@ -75,6 +75,14 @@ all_data[, LMV.USD := shift(MV.USD, 1L), by=Id]
 all_data[, LMV := shift(MV, 1L), by=Id]
 all_data[, LMP := shift(UP, 1L), by=Id]
 
+#lagAdjusetd Equity
+hlpvariable <- all_data %>% group_by(Id, year) %>% filter(month == 6)%>%mutate(adjustedEquity=log(NOSH/AF))%>%
+  ungroup()
+hlpvariable <- as.data.table(hlpvariable)
+hlpvariable[, lagAdjustedEquity := shift(adjustedEquity, 1L), by=Id]
+all_data[,hcjun := ifelse(month>=7,year,year-1)]
+all_data <- merge(all_data, hlpvariable[,c("Id", "year", "adjustedEquity", "lagAdjustedEquity")], by.x = c("Id", "hcjun"), by.y = c("Id", "year"),
+                  all.x = T)
 
 #Construct the factors to investigate
 # Lag value for the monthly BM calculation

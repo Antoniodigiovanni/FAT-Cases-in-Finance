@@ -71,11 +71,13 @@ factors <- all_data %>% mutate(
   tey_dummy = ifelse(TEY<0, 1, 0),
   BookToEV = WC05491/WC18100,
   DtoE = WC03255 /WC03501,
-  QuickRatio = (WC02201 - WC02101) / WC03101
+  QuickRatio = (WC02201 - WC02101) / WC03101,
+  NSI=adjustedEquity-lagAdjustedEquity
+  
 ) %>% 
   select(Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, Beta, ym,
          BM, BM_m, bm_dummy, bm_m_dummy, EP, EP_m, earnings_dummy, CP, CP_m, cashflow_dummy, ROE, ROA, GPA, profits_dummy,
-         OPBE, op_dummy, OA, OL, NOA, AG, ItA,
+         OPBE, op_dummy, OA, OL, NOA, AG, ItA, NSI,
          EPS, eps_dummy, TEY, tey_dummy, BookToEV, DtoE, QuickRatio, noa_dummy, oa_dummy, pf.size, hcjun) %>% 
   rename(country = country.x) %>% drop_na(MV.USD.June)
 
@@ -99,6 +101,6 @@ factors <- left_join(factors,
 # Add "Beta" to the list once fixed (now it is a list embedded in a df and errors arise from this)
 Yearly_factors_list = (c("Beta", "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
                           "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV", 
-                          "DtoE", "QuickRatio"))
+                          "DtoE", "QuickRatio", "NSI"))
 
 Monthly_factors_list = c("CP_m", "BM_m", "EP_m", "Momentum")
