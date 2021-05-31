@@ -21,14 +21,53 @@ cross_reg <- factors %>% select(Id, ym, country, RET.USD, Beta, BM, bm_dummy , O
 # Set negative values for OPBE to 0
 cross_reg[OPBE<0]$OPBE <- 0
 cross_reg[BM<0]$BM <- 0
+cross_reg[AG<0]$AG <- 0
+
+
+# Try the log of the variables
+cross_reg <- cross_reg %>% mutate(BM = log(BM), OPBE = log(OPBE), AG = log(AG),
+                                  MV.USD.June = log(MV.USD.June)) %>% replace(is.na(.), 0)
+
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[1],
+                                  beta=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[2],
+                                  bm=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[3],
+                                  opbe = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[4],
+                                  ag = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[5],
+                                  size = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[6],
+                                  kor = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[7],
+                                  sgp = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[8],
+                                  twn = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[9],
+                                  bm_dummy = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[10],
+                                  op_dummy = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[11],
+                                  no.obs=length(Id)),by=ym]
+
+
+ffm <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.estimates[, t.test(beta)]$statistic),
+                  BM = c(CS.reg.estimates[,t.test(bm)]$estimate, CS.reg.estimates[, t.test(bm)]$statistic),
+                  OPBE = c(CS.reg.estimates[,t.test(opbe)]$estimate, CS.reg.estimates[, t.test(opbe)]$statistic),
+                  AG = c(CS.reg.estimates[,t.test(ag)]$estimate, CS.reg.estimates[, t.test(ag)]$statistic),
+                  Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic))
 
 # lm(RET.USD~., data=cross_reg[-c(Date)])
+
+cross_reg <- factors %>% select(Id, ym, country, RET.USD, Beta, BM, bm_dummy , OPBE, op_dummy , AG, MV.USD.June) %>% 
+  drop_na(.) %>% 
+  filter(AG != "Inf")
+# Set negative values for OPBE to 0
+cross_reg[OPBE<0]$OPBE <- 0
+cross_reg[BM<0]$BM <- 0
+
 CS.reg.estimates <- cross_reg[, .(intercept=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[1],
                                     beta=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[2],
                                     bm=lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[3],
                                     opbe = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[4],
                                     ag = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[5],
                                     size = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[6],
+                                  kor = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[7],
+                                  sgp = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[8],
+                                  twn = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[9],
+                                  bm_dummy = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[10],
+                                  op_dummy = lm(RET.USD~Beta+BM+OPBE+AG+MV.USD.June+as.factor(country)+bm_dummy+op_dummy)$coefficient[11],
                                         no.obs=length(Id)),by=ym]
 
 

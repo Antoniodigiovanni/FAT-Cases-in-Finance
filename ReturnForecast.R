@@ -8,30 +8,37 @@ Sys.setlocale("LC_TIME", "C")
 
 source("Factors.R")
 
-# Temporary Model: BM_m, GPA, NOA, NSI, I/A, Size, Momentum, Beta
+# Temporary Model: BM_m, GPA, Size, Momentum
 
 # Monthly cross-sectional regression (adding a country dummy + negative earning dummies)
 
 cross_reg <- factors %>% 
-  select(Id, ym, RET, Beta, BM_m, bm_m_dummy, 
+  select(Id, ym, RET, BM_m, bm_m_dummy, 
          GPA, profits_dummy,
-         NOA, noa_dummy, ItA,
-         MV.USD, Momentum, country) %>% 
+         LMV, Momentum, country) %>% 
   drop_na(.)
 
 
-cross_reg[BM_m<=0]$BM_m <- NA
-cross_reg[GPA<=0]$GPA <- NA
-cross_reg[NOA<=0]$NOA <- NA
+cross_reg[BM_m<=0]$BM_m <- 0
+cross_reg[GPA<=0]$GPA <- 0
+cross_reg <- cross_reg %>% mutate(BM_m = log(BM_m), GPA = log(GPA),
+                                  MV.USD = log(MV.USD))
+
+cross_reg[GPA == -Inf]$GPA <- 0
+cross_reg[BM_m == -Inf]$BM_m <- 0
 # cross_reg <- cross_reg %>% mutate(across(where(is.numeric), log))
-CS.reg.estimates <- cross_reg[, .(intercept=lm(RET~Beta+log(BM_m)+log(GPA)+log(NOA)+ItA+log(MV.USD)+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy, na.action = na.omit)$coefficient[1],
-                                  beta=lm(RET~Beta+log(BM_m)+log(GPA)+log(NOA)+ItA+log(MV.USD)+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy, na.action = na.omit)$coefficient[2],
-                                  bm_m=lm(RET~Beta+log(BM_m)+log(GPA)+log(NOA)+ItA+log(MV.USD)+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy, na.action = na.omit)$coefficient[3],
-                                  gpa=lm(RET~Beta+log(BM_m)+log(GPA)+log(NOA)+ItA+log(MV.USD)+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy, na.action = na.omit)$coefficient[4],
-                                  noa=lm(RET~Beta+log(BM_m)+log(GPA)+log(NOA)+ItA+log(MV.USD)+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy, na.action = na.omit)$coefficient[5],
-                                  ita=lm(RET~Beta+log(BM_m)+log(GPA)+log(NOA)+ItA+log(MV.USD)+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy, na.action = na.omit)$coefficient[6],
-                                  size=lm(RET~Beta+log(BM_m)+log(GPA)+log(NOA)+ItA+log(MV.USD)+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy, na.action = na.omit)$coefficient[7],
-                                  mom=lm(RET~Beta+log(BM_m)+log(GPA)+log(NOA)+ItA+log(MV.USD)+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy, na.action = na.omit)$coefficient[8],
+#lm(RET~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy ,data=cross_reg)
+
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[1],
+                                  bm_m=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[2],
+                                  gpa=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[3],
+                                  size=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[4],
+                                  mom=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[5],
+                                  KOR=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[6],
+                                  SGP=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[7],
+                                  TWN=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[8],
+                                  bm_m_dummy=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[9],
+                                  profits_dummy=lm(RET~BM_m+GPA+MV.USD+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[10],
                                   no.obs=length(Id)),by=ym]
 
 
@@ -53,7 +60,6 @@ Model_significance <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estima
                             BM_M = c(CS.reg.estimates[,t.test(bm_m)]$estimate, CS.reg.estimates[, t.test(bm_m)]$statistic),
                             GPA = c(CS.reg.estimates[,t.test(gpa)]$estimate, CS.reg.estimates[, t.test(gpa)]$statistic),
                             NOA = c(CS.reg.estimates[,t.test(noa)]$estimate, CS.reg.estimates[, t.test(noa)]$statistic),
-                            ItA = c(CS.reg.estimates[,t.test(ita)]$estimate, CS.reg.estimates[, t.test(ita)]$statistic),
                             Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic),
                             Mom = c(CS.reg.estimates[,t.test(mom)]$estimate, CS.reg.estimates[, t.test(mom)]$statistic))
 
@@ -72,15 +78,35 @@ Avg_coef <- CS.reg.estimates %>%
 Rolling_Avg <- rollapplyr(data=CS.reg.estimates[,-c("ym","no.obs")], list(seq(-36,-1)), mean, by.column=TRUE, fill=NA)
 Rolling_Avg <- cbind(Rolling_Avg, CS.reg.estimates[,c("ym")])
 
+# Test expected returns on 5FM first
+ffm_factors <- cross_reg %>% select(Id, country, ym, MV.USD.June, RET.USD, Beta, BM, OPBE, AG, op_dummy, bm_dummy)
+
+ffm_factors <- left_join(ffm_factors,
+                           Rolling_Avg,#[,-c("intercept")], 
+                           by=c("ym"))
+
+#check <- ffm_factors %>% filter(Id == "13039P") %>% drop_na()
+
+
+Ret <- ffm_factors %>%
+  mutate(Exp.RET = intercept + (beta*Beta)+(BM*bm)+(OPBE*opbe)+(AG*ag)+(MV.USD.June*size)+
+           ifelse(country=="SGP", sgp, ifelse(country=="KOR", kor, ifelse(country=="TWN", twn, 0)))+
+           op_dummy.x * op_dummy.y + bm_dummy.x * bm_dummy.y ) %>% 
+  select(Id,country,ym,RET.USD,Exp.RET) %>% as.data.table()
+
 # Use the rolling average to forecast the returns - multiply each coefficient by the current characteristics
-Final_factors <- cross_reg %>% select(Id,country,ym,MV.USD,RET,Beta,BM_m,GPA,NOA,ItA,Momentum)#,NSI)
+Final_factors <- cross_reg %>% select(Id,country,ym,MV.USD.June,RET,Beta,BM_m,GPA,NOA,Momentum, bm_m_dummy,
+                                      profits_dummy, noa_dummy)#,NSI)
 
 Final_factors <- left_join(Final_factors,
                            Rolling_Avg,#[,-c("intercept")], 
                            by=c("ym"))
 
 Ret <- Final_factors %>%
-  mutate(Exp.RET = (beta*Beta)+(log(BM_m)*bm_m)+(log(GPA)*gpa)+(log(NOA)*noa)+(ItA*ita)+(log(MV.USD)*size)+(Momentum*mom)) %>% 
+  mutate(Exp.RET = intercept+(beta*Beta)+(BM_m*bm_m)+(GPA*gpa)+(NOA*noa)+
+           (MV.USD.June*size)+(Momentum*mom)+
+           ifelse(country=="SGP", SGP, ifelse(country=="KOR", KOR, ifelse(country=="TWN", TWN, 0)))+
+           bm_m_dummy.x*bm_m_dummy.y+profits_dummy.x*profits_dummy.y+noa_dummy.x*noa_dummy.y) %>% 
   select(Id,country,ym,RET,Exp.RET) %>% as.data.table()
 
 
@@ -128,13 +154,14 @@ Ret[ , pf.exp.ret := ifelse(Exp.RET>bb80, "Big",
 Ret[,year:=year(ym)]
 quarter(Ret$ym)
 Yearly_ret <- Ret %>% 
-  mutate(RET = RET/100+1,
-         Exp.RET = Exp.RET/100+1) %>% 
+  mutate(RET = (RET/100+1)*100,
+         Exp.RET = Exp.RET/100+1)*100 %>% 
   group_by(Id,year) %>%
   summarise(RET = prod(RET)-1,
             Exp.RET = prod(Exp.RET)-1)
   
   
   
-  
+# Run regression
+lm(RET~Exp.RET+as.factor(country), data = Yearly_ret)
   
