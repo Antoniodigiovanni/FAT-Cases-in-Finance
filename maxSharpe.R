@@ -70,12 +70,12 @@ portfolio_values <- as.data.frame(cbind(portfolio_values, all_wts))
 
 
 ### use optimizer
-require("optimization")
+require("optimx")
 weights<-as.numeric(as_vector(t(wts)))
-x<-as.numeric(vector(length = nrow(tick_2018)))
+x<-as.vector(paste(c("x"),1:nrow(tick_2018),sep =""))
 f <- function (x) {
-  sum(x * tick_2018$RET)/(sqrt(t(x) %*% (cov_mat %*% x)))
+ -(if(x>1){-100} else if(x<0){-100}else if(sum(x)!=1){-100}else{as.numeric(sum(x * tick_2018$RET)/(sqrt(t(x) %*% (cov_mat %*% x))))})
 }
-output<-optim_nm(fun = f,start = as.vector(weights), exit = 10, trace =TRUE)
-
-
+output<-optimx(par=weights, fn =f,gr=NULL , hess=NULL, lower=0,
+               upper=1, method='L-BFGS-B', itnmax=2)
+w<-t(as.data.frame(output))
