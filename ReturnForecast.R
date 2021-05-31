@@ -8,11 +8,95 @@ Sys.setlocale("LC_TIME", "C")
 
 source("Factors.R")
 
+#Data from Datastream
+load(file.path("Data","FAT_monthly.RData"))
+load(file.path("Data","FAT_static.RData"))
+# Yearly Accounting Data from Worldscope
+load(file.path("Data","FAT_yearly.RData"))
+
+# Get data from year 1994 to ensure data quality
+FAT.monthly[, month := month(Date)]
+FAT.monthly[, year := year(Date)]
+FAT.monthly <- FAT.monthly %>% filter(year > 1993)
+
+small_static <- FAT.static %>% select(Id, INDM)
+
+all_data <- merge(FAT.monthly, small_static, by = "Id")
+#table(small_static$INDM)
+
+# Banks, Consumer Finance, FInancial Admin., Insurance Brokers, Mortgage Finance, Investment Services,
+# Specialty Finance, Venture Capital Trust, Private Equity, Real Estate Hold, Dev, Reinsurance,
+# Life Insurance, Asset Managers
+# Exclude financial companies
+cols_exlude <- c("Banks", "Consumer Finance", "Financial Admin.", "Insurance Brokers", "Mortgage Finance",
+                 "Investment Services", "Specialty Finance", "Venture Capital Trust", "Private Equity",
+                 "Real Estate Hold, Dev", "Reinsurance", "Life Insurance", "Asset Managers")
+
+all_data <- all_data %>% filter(!(INDM %in% cols_exlude)) %>% select(-INDM)
+
+# Following Hou et al.(2018) and excluding all micro stocks
+# Create MV.USD.June to get yearly MV that matches with yearly accounting data
+# MV.USD.June in Year y is for July year y until June y + 1
+hlpvariable <- all_data %>% group_by(Id, year) %>% filter(month == 6)
+hlpvariable <- hlpvariable %>% select(Id, year, MV.USD, MV) %>% rename(MV.USD.June = MV.USD, MV.June = MV)
+all_data[,hcjun := ifelse(month>=7,year,year-1)]
+all_data <- merge(all_data, hlpvariable, by.x = c("Id", "hcjun"), by.y = c("Id", "year"),
+                  all.x = T)
+
+# Define stocks into three size groups for each country
+setorder(all_data, country, Date, -MV.USD.June)
+hlpvariable <- all_data[month == 7 & !is.na(MV.USD.June)] %>% group_by(country, year) %>% 
+  mutate(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.97,"Micro",
+                          ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big"))) %>% 
+  select(country, year, pf.size, Id)
+
+all_data <- merge(all_data,hlpvariable,
+                  by.x=c("hcjun","Id", "country"),
+                  by.y=c("year","Id", "country"),
+                  all.x=T)
+
+# Percentage of Micro Stocks in our sample
+# How many unique micro stocks are in our sample
+micro_stocks <- all_data %>% filter(pf.size == "Micro")
+nrow(all_data %>% filter(pf.size == "Micro")) / nrow(all_data)
+
+all_data <- all_data %>% filter(pf.size != "Micro")
+
+all_data <- merge(all_data, FAT.yearly, by.x = c("Id", "year"), by.y = c("Id", "YEAR"), all.x = T)
+
+current_factors <- all_data %>% mutate(
+  BM_m = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV*1000),
+  bm_m_dummy = ifelse(BM_m < 0, 1, 0),
+  GPA =  (WC01001 - WC01501) / WC02999,
+  profits_dummy = ifelse(GPA < 0, 1, 0)
+) %>% 
+  select(Id, country.x, Date, month, year, MV.USD, MV.USD.June, RET.USD, RET, ym,
+         BM_m, bm_m_dummy, GPA, profits_dummy,
+         pf.size, hcjun) %>% 
+  rename(country = country.x) %>% drop_na(MV.USD.June)
+
+# Include FFtF and we use EBITDA - EBIT to get depreciation amount
+
+#Momentum
+Momentum <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>% 
+  do(cbind(reg_col = select(., RET.adj) %>% 
+             rollapplyr(list(seq(-12, -2)), prod, by.column = FALSE, fill = NA),
+           date_col = select(., Date))) %>% 
+  ungroup() %>% rename("Momentum" = reg_col)
+
+Momentum <- Momentum %>% mutate(Momentum = (Momentum-1)*100)
+
+current_factors <- left_join(current_factors,
+                     Momentum,
+                     by=c("Id", "Date"))
+
+# Not Sure if Momentum is correct
+
 # Temporary Model: BM_m, GPA, Size, Momentum
 
 # Monthly cross-sectional regression (adding a country dummy + negative earning dummies)
 
-cross_reg <- factors %>% filter(year>2001) %>% 
+cross_reg <- factors %>% 
   select(Id, ym, RET, BM_m, bm_m_dummy, 
          GPA, profits_dummy,
          LMV, Momentum, country) %>% 
@@ -94,8 +178,16 @@ Ret <- ffm_factors %>%
            op_dummy.x * op_dummy.y + bm_dummy.x * bm_dummy.y ) %>% 
   select(Id,country,ym,RET.USD,Exp.RET) %>% as.data.table()
 
-# Use the rolling average to forecast the returns - multiply each coefficient by the current characteristics
+# Try someting without rolling window
 Final_factors <- cross_reg %>% select(Id,country,ym,LMV,RET,BM_m,GPA,Momentum, bm_m_dummy,
+                                      profits_dummy)#,NSI)
+
+Final_factors <- left_join(Final_factors,
+                           Rolling_Avg,#[,-c("intercept")], 
+                           by=c("ym"))
+
+# Use the rolling average to forecast the returns - multiply each coefficient by the current characteristics
+Final_factors <- current_factors %>% select(Id,country,ym,LMV,RET,BM_m,GPA,Momentum, bm_m_dummy,
                                       profits_dummy)#,NSI)
 
 Final_factors <- left_join(Final_factors,
