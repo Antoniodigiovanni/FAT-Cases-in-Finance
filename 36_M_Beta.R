@@ -9,9 +9,10 @@ setwd (dirname(getActiveDocumentContext()$path))
 # Set Date Language in English
 Sys.setlocale("LC_TIME", "C")
 
-load("FAT_monthly.RData")
-load("FAT_static.RData")
-load("FAT_yearly.RData")
+load(file.path("Data","FAT_monthly.RData"))
+load(file.path("Data","FAT_static.RData"))
+# Yearly Accounting Data from Worldscope
+load(file.path("Data","FAT_yearly.RData"))
 
 # First drop the rows with NAs in MV, MV.USD, RET.USD to make the dataframe smaller
 FAT.monthly <- FAT.monthly %>% drop_na(MV, MV.USD, RET.USD)
