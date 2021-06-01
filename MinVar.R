@@ -1,3 +1,5 @@
+# Do not run the entire script! It requires a Matlab script before the second for loop can be executed
+
 library(rstudioapi)
 
 
@@ -47,10 +49,16 @@ for (y in Years_list){
  }
 }
 rm(y)
-# Perform optimization on Matlab, in ./Min_Var/Min_Var.m
 
+
+###########################################################
+#                                                         #
+# Perform optimization on Matlab, in ./Min_Var/Min_Var.m  #
+#                                                         #
+###########################################################
 
 # Afterwards load the csv files with the optimal weights.
+Portfolio_Returns <- data.table()
 for (y in Years_list){
 
   # Loading Portfolio Weights
@@ -59,14 +67,30 @@ for (y in Years_list){
     #assign(paste0("Weight_",y),read_csv(file.path("Min_Var",paste0("weights_", y,".csv"))))
     
     Weight <- read_csv(file.path("Min_Var",paste0("weights_", y,".csv")))
-    print(y)
-    print(nrow(Weight))
-    print("\n")
-  
-}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-  
-# Perform calculations on portfolios or create some df with all the Ids and the
-# weights for each year ...
+    Weight <- Weight %>% rename("Id" = Row) %>% mutate(Id = as.character(Id))
+    #print(y)
+    #print(nrow(Weight))
+    #print("\n")
 
+    # Perform calculations on portfolios or create some df with all the Ids and the
+    # weights for each year ...
+    stocks_ret <- stocks %>% 
+      filter(ym < as.yearmon(paste0("Jul", year(as.yearmon(y)))) &
+               ym >= (as.yearmon(paste0("Jul", year(as.yearmon(y))))-36/12))
+    stocks_ret <- stocks_ret %>% filter(Id %in% Weight$Id) %>% mutate(RET = (RET/100+1)) %>% 
+      group_by(Id) %>% 
+      summarise(Ret = prod(RET)) %>% mutate(Ret = Ret-1)
+    portfolio <- left_join(Weight, stocks_ret, by="Id")
+    #portfolio_ret <- portfolio %>% 
+    portfolio_ret <- weighted.mean(x = portfolio$Ret,w = portfolio$x_vect, na.rm = T)
+    portfolio_ret <- as.data.frame(cbind(y, portfolio_ret))
+    Portfolio_Returns <- as.data.table(rbind(Portfolio_Returns, portfolio_ret))
+      
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
 
 }
+# Calculate portfolio returns
+Portfolio_Returns <- Portfolio_Returns %>% arrange(y) %>% 
+  mutate(ret = 1+portfolio_ret, Value=100) %>% mutate(Value = lag(Value) *ret)
+Portfolio_Returns$Value[1] <- 100
+plot(Portfolio_Returns$y, Portfolio_Returns$Value, type = "l")
