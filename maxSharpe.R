@@ -3,23 +3,51 @@ library(plotly) # To create interactive charts
 library(timetk) # To manipulate the data series
 #create list with all stocks in last month
 
-#for i in 2000:2018{}
-tick_2018<-all_data[year <= i & month == 7 &!is.na(RET.USD)]%>% select (Id, RET)
-tick <- merge(tick_2018[,c("Id")], all_data[,c("Id", "Date", "RET")], by.x = c("Id"), by.y = c("Id"),
+for i in 2000:2018{
+tick_year<-all_data[year ==i & month == 7 &!is.na(RET)]%>% select (Id, RET)#this needs to be the forecast later
+tick<-all_data[year <=i & month == 7 &!is.na(RET)]%>% select (Id, Date, RET)
+tick <- merge(tick_year[,c("Id")], tick[,c("Id", "Date", "RET")], by.x = c("Id"), by.y = c("Id"),
               all.x = T)
 
-log_ret_tidy <- tick %>%select(Id, Date, RET)
-log_ret_spread <- log_ret_tidy %>%
+tick_spread <- tick %>%
   spread(Id, value = RET)
-log_ret_spread_1<-log_ret_spread%>%select(-c("Date"))
-cov_mat <- cov(log_ret_spread_1/100, use= "pairwise.complete.obs")
+tick_spread_1<-tick_spread%>%select(-c("Date"))
+cov_mat <- cov(tick_spread_1/100, use= "pairwise.complete.obs")
+cov_mat[is.na(cov_mat)] = 0
+
+### use optimizer
+require("optimx")
+
+nulle <- vector('numeric', length = nrow(tick_year))
+einse <- vector('numeric', length = nrow(tick_year))
+einse <- einse+1
+wts <- as.data.frame(runif(n = nrow(tick_year), min=0, max = 0.2))
+wts<-as.numeric(as_vector(t(wts)))
+x<-as.vector(paste(c("x"),1:nrow(tick_year),sep =""))
+f <- function (x) {
+  -({as.numeric(sum(x * tick_year$RET)/(sqrt(t(x) %*% (cov_mat %*% x))))})
+}
+
+ouput <- axsearch(wts, fn=f, fmin=NULL, lower=nulle, upper=einse, bdmsk=einse, trace=0)
+
+
+output<-optimx(par=wts, fn =f,gr=NULL , hess=NULL, lower=0,
+                 upper=1, method='L-BFGS-B', itnmax=100)
+w<-t(as.data.frame(output))
+
+#sqrt(t(wts) %*% (cov_mat %*% wts))
+
+}
+
+
+
 
 nsim <-10000
 
 # Creating a matrix to store the weights
 
 all_wts <- as.data.frame(matrix(nrow = nsim,
-                  ncol = nrow(tick_2018)))
+                                ncol = nrow(tick_2018)))
 
 # Creating an empty vector to store
 # Portfolio returns
@@ -57,7 +85,7 @@ for (i in 1:nsim) {
   
   #store SR
   sharpe_ratio[i] <-sr
-
+  
 }
 
 portfolio_values <- tibble(Return = port_returns,
@@ -66,16 +94,3 @@ portfolio_values <- tibble(Return = port_returns,
 colnames(all_wts)<-colnames(log_ret_spread_1)
 
 portfolio_values <- as.data.frame(cbind(portfolio_values, all_wts))
-
-
-
-### use optimizer
-require("optimx")
-weights<-as.numeric(as_vector(t(wts)))
-x<-as.vector(paste(c("x"),1:nrow(tick_2018),sep =""))
-f <- function (x) {
- -(if(x>1){-100} else if(x<0){-100}else if(sum(x)!=1){-100}else{as.numeric(sum(x * tick_2018$RET)/(sqrt(t(x) %*% (cov_mat %*% x))))})
-}
-output<-optimx(par=weights, fn =f,gr=NULL , hess=NULL, lower=0,
-               upper=1, method='L-BFGS-B', itnmax=2)
-w<-t(as.data.frame(output))
