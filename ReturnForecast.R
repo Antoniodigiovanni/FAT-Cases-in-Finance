@@ -5,92 +5,17 @@ setwd(dirname(getActiveDocumentContext()$path))
 
 # Set Date Language in English
 Sys.setlocale("LC_TIME", "C")
-
+source("Real_data_prep.R")
 source("Factors.R")
 
-#Data from Datastream
-load("FAT_monthly.RData")
-load("FAT_static.RData")
-# Yearly Accounting Data from Worldscope
-load("FAT_yearly.RData")
-
 # Get data from year 1994 to ensure data quality
-FAT.monthly[, month := month(Date)]
-FAT.monthly[, year := year(Date)]
-FAT.monthly <- FAT.monthly %>% filter(year > 1993)
 
-small_static <- FAT.static %>% select(Id, INDM)
-
-all_data <- merge(FAT.monthly, small_static, by = "Id")
 #table(small_static$INDM)
 
 # Banks, Consumer Finance, FInancial Admin., Insurance Brokers, Mortgage Finance, Investment Services,
 # Specialty Finance, Venture Capital Trust, Private Equity, Real Estate Hold, Dev, Reinsurance,
 # Life Insurance, Asset Managers
 # Exclude financial companies
-cols_exlude <- c("Banks", "Consumer Finance", "Financial Admin.", "Insurance Brokers", "Mortgage Finance",
-                 "Investment Services", "Specialty Finance", "Venture Capital Trust", "Private Equity",
-                 "Real Estate Hold, Dev", "Reinsurance", "Life Insurance", "Asset Managers")
-
-all_data <- all_data %>% filter(!(INDM %in% cols_exlude)) %>% select(-INDM)
-
-# Following Hou et al.(2018) and excluding all micro stocks
-# Create MV.USD.June to get yearly MV that matches with yearly accounting data
-# MV.USD.June in Year y is for July year y until June y + 1
-hlpvariable <- all_data %>% group_by(Id, year) %>% filter(month == 6)
-hlpvariable <- hlpvariable %>% select(Id, year, MV.USD, MV) %>% rename(MV.USD.June = MV.USD, MV.June = MV)
-all_data[,hcjun := ifelse(month>=7,year,year-1)]
-all_data <- merge(all_data, hlpvariable, by.x = c("Id", "hcjun"), by.y = c("Id", "year"),
-                  all.x = T)
-
-# Define stocks into three size groups for each country
-setorder(all_data, country, Date, -MV.USD.June)
-hlpvariable <- all_data[month == 7 & !is.na(MV.USD.June)] %>% group_by(country, year) %>% 
-  mutate(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.97,"Micro",
-                          ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big"))) %>% 
-  select(country, year, pf.size, Id)
-
-all_data <- merge(all_data,hlpvariable,
-                  by.x=c("hcjun","Id", "country"),
-                  by.y=c("year","Id", "country"),
-                  all.x=T)
-
-# Percentage of Micro Stocks in our sample
-# How many unique micro stocks are in our sample
-micro_stocks <- all_data %>% filter(pf.size == "Micro")
-nrow(all_data %>% filter(pf.size == "Micro")) / nrow(all_data)
-
-all_data <- all_data %>% filter(pf.size != "Micro")
-
-all_data <- merge(all_data, FAT.yearly, by.x = c("Id", "year"), by.y = c("Id", "YEAR"), all.x = T)
-
-current_factors <- all_data %>% mutate(
-  BM_m = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV*1000),
-  bm_m_dummy = ifelse(BM_m < 0, 1, 0),
-  GPA =  (WC01001 - WC01501) / WC02999,
-  profits_dummy = ifelse(GPA < 0, 1, 0)
-) %>% 
-  select(Id, country.x, Date, month, year, MV, MV.USD.June, RET.USD, RET, ym,
-         BM_m, bm_m_dummy, GPA, profits_dummy,
-         pf.size, hcjun) %>% 
-  rename(country = country.x) %>% drop_na(MV.USD.June)
-
-# Include FFtF and we use EBITDA - EBIT to get depreciation amount
-
-#Momentum
-Momentum <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>% 
-  do(cbind(reg_col = select(., RET.adj) %>% 
-             rollapplyr(list(seq(-12, -2)), prod, by.column = FALSE, fill = NA),
-           date_col = select(., Date))) %>% 
-  ungroup() %>% rename("Momentum" = reg_col)
-
-Momentum <- Momentum %>% mutate(Momentum = (Momentum-1)*100)
-
-current_factors <- left_join(current_factors,
-                     Momentum,
-                     by=c("Id", "Date"))
-
-# Not Sure if Momentum is correct
 
 # Temporary Model: BM_m, GPA, Size, Momentum
 
@@ -254,24 +179,25 @@ Ret <- Ret %>% drop_na()
 
 # Check Quintiles of returns and exp returns
 
-Ret <- as.data.table(Ret)
-  hlpvariable2 <- Ret[!is.na(RET)] %>% 
-    group_by(country, ym) %>% 
-    summarize(bb20 = quantile(RET, probs = c(0.2), na.rm = T),
-              bb40 = quantile(RET, probs = c(0.4), na.rm = T),
-              bb60 = quantile(RET, probs = c(0.6), na.rm = T),
-              bb80 = quantile(RET, probs = c(0.8), na.rm = T)) %>% 
-    select(ym, country, bb20, bb40, bb60, bb80)
+#Ret <- as.data.table(Ret)
+#  hlpvariable2 <- Ret[!is.na(RET)] %>% 
+#    group_by(country, ym) %>% 
+#    summarize(bb20 = quantile(RET, probs = c(0.2), na.rm = T),
+#              bb40 = quantile(RET, probs = c(0.4), na.rm = T),
+#              bb60 = quantile(RET, probs = c(0.6), na.rm = T),
+#              bb80 = quantile(RET, probs = c(0.8), na.rm = T)) %>% 
+#    select(ym, country, bb20, bb40, bb60, bb80)
 
   
 Ret <- left_join(Ret, hlpvariable2,
                  by=c("ym","country"))
 
-Ret[ , pf.ret := ifelse(RET>bb80, "Big",
-                        ifelse((RET<=bb80 & RET>bb60),"LessBig",
-                               ifelse((RET<=bb60 & RET>bb40),"Neutral",
-                                      ifelse((RET<=bb40 & RET>bb20),"LessSmall",
+#Ret[ , pf.ret := ifelse(RET>bb80, "Big",
+#                        ifelse((RET<=bb80 & RET>bb60),"LessBig",
+#                               ifelse((RET<=bb60 & RET>bb40),"Neutral",
+#                                      ifelse((RET<=bb40 & RET>bb20),"LessSmall",
                                              ifelse(RET<=bb20,"Small",NA)))))]
+
 #Exp.Ret
 Ret <- as.data.table(Ret)
 hlpvariable2 <- Ret[!is.na(Exp.RET)] %>% 
