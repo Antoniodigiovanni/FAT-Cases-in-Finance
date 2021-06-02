@@ -1,7 +1,7 @@
 library(rstudioapi)
 
 # Set the working directory to the script directory
-setwd (dirname(getActiveDocumentContext()$path))
+setwd (dirname(getActiveDocumentContext()$path)) 
 
 source("Real_data_prep.R")
 
@@ -35,37 +35,34 @@ rm(Beta_36_M)
 # We have to first set the NA Values to 0 and then we can use it in the calculation
 factors <- all_data
 factors <- factors %>% replace(is.na(.), 0)
-# factors <- factors %>% replace_na(list(WC01101=0))
-# factors <- factors %>% replace_na(list(WC01051=0))
-# factors <- factors %>% replace_na(list(WC01251=0))
-# factors <- factors %>% replace_na(list(WC03263=0))
-
 
 factors <- factors %>% mutate(
-  BM = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (MV.June*1000),
-  BM_m = (WC03501+ifelse(is.na(WC03263),0,WC03263)) / (LMV*1000),
-  bm_dummy = ifelse(WC03501<0, 1, 0),
+  BM = (WC03501+WC03263) / (MV.June*1000),
+  BM_m = (WC03501+WC03263) / (LMV*1000),
+  bm_dummy = ifelse(BM<0, 1, 0),
   bm_m_dummy = ifelse(BM_m < 0, 1, 0),
   EP = WC03501 / (MV.June*1000 / NOSH),
   EP_m = WC03501 / LMP,
-  earnings_dummy = ifelse(WC03501 < 0, 1, 0),
+  earnings_dummy = ifelse(EP < 0, 1, 0),
+  earnings_m_dummy = ifelse(EP_m<0, 1, 0),
   CP = WC04860 / (MV.June*1000 / NOSH),
   CP_m = WC04860 / LMP,
-  cashflow_dummy = ifelse(WC04860 < 0, 1, 0),
-  ROE = WC01551 / (WC03501 + ifelse(is.na(WC03263),0,WC03263)),
-  ROA = (WC01551 / WC02999),
+  cashflow_dummy = ifelse(CP < 0, 1, 0),
+  cashflow_m_dummy = ifelse(CP_m<0, 1, 0),
+  ROE = WC01551 / (WC03501 +WC03263),
+  ROA = (WC01551 / WC02999), 
   GPA =  (WC01001 - WC01501) / WC02999,
-  profits_dummy = ifelse((WC01001 - WC01501) < 0, 1, 0),
+  profits_dummy = ifelse(GPA < 0, 1, 0),
   OPBE = (WC01001 - WC01051 - WC01101 - WC01251) / (WC03501+WC03263),
   #OPBE = (ifelse(!is.na(WC01051)| !is.na(WC01101) | !is.na(WC01251),
                  #ifelse(is.na(WC01001),0,WC01001) - ifelse(is.na(WC01051),0,WC01051) - ifelse(is.na(WC01101),0,WC01101) - ifelse(is.na(WC01251),0,WC01251) / (WC03501 + ifelse(is.na(WC03263),0,WC03263)),NA)),
   op_dummy = ifelse(OPBE<0, 1, 0),
   # Deflated means divided or subtracted?
-  OA = ((((WC02201 - LWC02201) - (WC02001 - LWC02001) - (WC03101 - LWC03101) +
+  OA = ((((WC02201 - LWC02201) - (WC02001 - LWC02001) - (WC03101 - LWC03101) + 
            (WC03051 - LWC03051) + ifelse(!is.na(WC03063) & !is.na(LWC03063),
                                          (WC03063 - LWC03063),0)) - ifelse(is.na(WC01151),
                                                                            0,WC01151))/WC02999),
-    # (WC02201 - WC02001 - WC03101 + WC03051 +
+    # (WC02201 - WC02001 - WC03101 + WC03051 + 
     #       ifelse(WC03063=="NA",0,WC03063) - ifelse(WC01151=="NA",0,WC01151)),
   OL = WC02999 - WC03255 - WC03426 - WC03995,
   NOA = ((WC02999 - WC02001) - OL)/lag_total_assets,
@@ -84,23 +81,23 @@ factors <- factors %>% mutate(
   DtoE = WC03255 /WC03501,
   QuickRatio = (WC02201 - WC02101) / WC03101,
   NSI=adjustedEquity-lagAdjustedEquity
-) %>%
+) %>% 
   select(Id, country.x, Date, month, year, LMV, MV.USD, MV.USD.June, RET.USD, RET, Beta, ym,
-         BM, BM_m, bm_dummy, bm_m_dummy, EP, EP_m, earnings_dummy, CP, CP_m, cashflow_dummy, ROE, ROA, GPA, profits_dummy,
+         BM, BM_m, bm_dummy, bm_m_dummy, EP, EP_m, earnings_dummy, earnings_m_dummy, CP, CP_m, cashflow_dummy, cashflow_m_dummy, ROE, ROA, GPA, profits_dummy,
          OPBE, op_dummy, OA, OL, NOA, AG, ItA, NSI,
-         EPS, eps_dummy, TEY, tey_dummy, BookToEV, DtoE, QuickRatio, noa_dummy, oa_dummy, pf.size, hcjun) %>%
+         EPS, eps_dummy, TEY, tey_dummy, BookToEV, DtoE, QuickRatio, noa_dummy, oa_dummy, pf.size, hcjun) %>% 
   rename(country = country.x) %>% drop_na(MV.USD.June)
 
 # Include FFtF and we use EBITDA - EBIT to get depreciation amount
 
 #Momentum
-Momentum <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>%
-  do(cbind(reg_col = select(., RET.adj) %>%
+Momentum <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>% 
+  do(cbind(reg_col = select(., RET.adj) %>% 
              rollapplyr(list(seq(-12, -2)), prod, by.column = FALSE, fill = NA),
-           date_col = select(., Date))) %>%
+           date_col = select(., Date))) %>% 
   ungroup() %>% rename("Momentum" = reg_col)
 
-Momentum <- Momentum %>% mutate(Momentum = (Momentum-1)*100)
+Momentum <- Momentum %>% mutate(Momentum = (Momentum-1))
 
 factors <- left_join(factors,
                      Momentum,
@@ -110,7 +107,7 @@ rm(Momentum)
 # Complete list of Factors passed to other scripts
 # Add "Beta" to the list once fixed (now it is a list embedded in a df and errors arise from this)
 Yearly_factors_list = (c("Beta", "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
-                          "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV",
+                          "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV", 
                           "DtoE", "QuickRatio", "NSI"))
 
 Monthly_factors_list = c("CP_m", "BM_m", "EP_m", "Momentum")

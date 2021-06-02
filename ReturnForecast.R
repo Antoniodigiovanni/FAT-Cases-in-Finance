@@ -1,7 +1,7 @@
 library(rstudioapi)
 
 # Set the working directory to the script directory
-setwd(dirname(getActiveDocumentContext()$path))
+setwd(dirname(getActiveDocumentContext()$path)) 
 
 # Set Date Language in English
 Sys.setlocale("LC_TIME", "C")
@@ -45,9 +45,9 @@ all_data <- merge(all_data, hlpvariable, by.x = c("Id", "hcjun"), by.y = c("Id",
 
 # Define stocks into three size groups for each country
 setorder(all_data, country, Date, -MV.USD.June)
-hlpvariable <- all_data[month == 7 & !is.na(MV.USD.June)] %>% group_by(country, year) %>%
+hlpvariable <- all_data[month == 7 & !is.na(MV.USD.June)] %>% group_by(country, year) %>% 
   mutate(pf.size = ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.97,"Micro",
-                          ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big"))) %>%
+                          ifelse((cumsum(MV.USD.June)/sum(MV.USD.June))>=0.90,"Small","Big"))) %>% 
   select(country, year, pf.size, Id)
 
 all_data <- merge(all_data,hlpvariable,
@@ -69,19 +69,19 @@ current_factors <- all_data %>% mutate(
   bm_m_dummy = ifelse(BM_m < 0, 1, 0),
   GPA =  (WC01001 - WC01501) / WC02999,
   profits_dummy = ifelse(GPA < 0, 1, 0)
-) %>%
+) %>% 
   select(Id, country.x, Date, month, year, MV, MV.USD.June, RET.USD, RET, ym,
          BM_m, bm_m_dummy, GPA, profits_dummy,
-         pf.size, hcjun) %>%
+         pf.size, hcjun) %>% 
   rename(country = country.x) %>% drop_na(MV.USD.June)
 
 # Include FFtF and we use EBITDA - EBIT to get depreciation amount
 
 #Momentum
-Momentum <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>%
-  do(cbind(reg_col = select(., RET.adj) %>%
+Momentum <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>% 
+  do(cbind(reg_col = select(., RET.adj) %>% 
              rollapplyr(list(seq(-12, -2)), prod, by.column = FALSE, fill = NA),
-           date_col = select(., Date))) %>%
+           date_col = select(., Date))) %>% 
   ungroup() %>% rename("Momentum" = reg_col)
 
 Momentum <- Momentum %>% mutate(Momentum = (Momentum-1)*100)
@@ -96,10 +96,10 @@ current_factors <- left_join(current_factors,
 
 # Monthly cross-sectional regression (adding a country dummy + negative earning dummies)
 
-cross_reg <- factors %>%
-  select(Id, ym, RET, BM_m, bm_m_dummy,
+cross_reg <- factors %>% 
+  select(Id, ym, RET, BM_m, bm_m_dummy, 
          GPA, profits_dummy,
-         LMV, Momentum, country) %>%
+         LMV, Momentum, country) %>% 
   drop_na(.)
 
 
@@ -159,14 +159,14 @@ Avg_coef <- CS.reg.estimates %>%
 
 
 # Second method, less rows and seems to provide the same results, check again.
-Rolling_Avg <- rollapplyr(data=CS.reg.estimates[,-c("ym","no.obs")], list(seq(-12,-1)), mean, by.column=TRUE, fill=NA)
+Rolling_Avg <- rollapplyr(data=CS.reg.estimates[,-c("ym","no.obs")], list(seq(-36,-1)), mean, by.column=TRUE, fill=NA)
 Rolling_Avg <- cbind(Rolling_Avg, CS.reg.estimates[,c("ym")])
 
 # Test expected returns on 5FM first
 ffm_factors <- cross_reg %>% select(Id, country, ym, MV.USD.June, RET.USD, Beta, BM, OPBE, AG, op_dummy, bm_dummy)
 
 ffm_factors <- left_join(ffm_factors,
-                           Rolling_Avg,#[,-c("intercept")],
+                           Rolling_Avg,#[,-c("intercept")], 
                            by=c("ym"))
 
 ffm_factors <- ffm_factors %>% mutate(SGP = ifelse(country == "SGP", 1, 0))
@@ -179,34 +179,75 @@ ffm_factors <- ffm_factors %>% mutate(TWN = ifelse(country == "TWN", 1, 0))
 
 Ret <- ffm_factors %>%
   mutate(Exp.RET = intercept + (beta*Beta)+(BM*bm)+(OPBE*opbe)+(AG*ag)+(MV.USD.June*size)+
-           SGP*sgp + KOR*kor + TWN*twn +
-           op_dummy.x * op_dummy.y + bm_dummy.x * bm_dummy.y ) %>%
+           SGP*sgp + KOR*kor + TWN*twn + 
+           op_dummy.x * op_dummy.y + bm_dummy.x * bm_dummy.y ) %>% 
   select(Id,country,ym,RET.USD,Exp.RET) %>% as.data.table()
 
-Ret <- Ret %>% drop_na()
-
-# Try someting without rolling window
-Final_factors <- cross_reg %>% select(Id,country,ym,LMV,RET,BM_m,GPA,Momentum, bm_m_dummy,
-                                      profits_dummy)#,NSI)
-
-Final_factors <- left_join(Final_factors,
-                           Rolling_Avg,#[,-c("intercept")],
-                           by=c("ym"))
 
 # Use the rolling average to forecast the returns - multiply each coefficient by the current characteristics
-Final_factors <- current_factors %>% select(Id,country,ym,MV,RET,BM_m,GPA,Momentum, bm_m_dummy,
-                                      profits_dummy)#,NSI)
+Final_factors <- factors %>% select(Id,country,ym,RET.USD, Beta, BM_m, GPA, NOA, Momentum, bm_m_dummy,
+                                      profits_dummy) %>% drop_na()
 
 Final_factors <- left_join(Final_factors,
-                           Rolling_Avg,#[,-c("intercept")],
+                           Rolling_Avg,#[,-c("intercept")], 
                            by=c("ym"))
+
+Final_factors <- Final_factors %>% mutate(SGP = ifelse(country == "SGP", 1, 0))
+Final_factors <- Final_factors %>% mutate(KOR = ifelse(country == "KOR", 1, 0))
+Final_factors <- Final_factors %>% mutate(TWN = ifelse(country == "TWN", 1, 0))
+
+Final_factors <- Final_factors %>% filter(RET.USD != 0 & Beta != 0 & Momentum != 0)
+Final_factors <- Final_factors %>% filter(!is.infinite(GPA) & !is.infinite(BM_m) & !is.infinite(NOA))
+
+#Winsorize the data before calculating return
+
+Final_factors <- Final_factors %>%  
+  group_by(Id) %>%  
+  mutate(mean_Beta=mean(Beta), mean_gpa=mean(GPA), mean_mom=mean(Momentum),
+         mean_bmm=mean(BM_m), mean_noa=mean(NOA))
+
+cut_bmm_top <- quantile(Final_factors$mean_bmm, 0.99)
+cut_bmm_bottom <- quantile(Final_factors$mean_bmm, 0.01)
+
+cut_beta_top <- quantile(Final_factors$mean_Beta, 0.99)
+cut_beta_bottom <- quantile(Final_factors$mean_Beta, 0.01)
+
+cut_gpa_top <- quantile(Final_factors$mean_gpa, 0.99)
+cut_gpa_bottom <- quantile(Final_factors$mean_gpa, 0.01)
+
+cut_mom_top <- quantile(Final_factors$mean_mom, 0.99)
+cut_mom_bottom <- quantile(Final_factors$mean_mom, 0.01)
+
+cut_noa_top <- quantile(Final_factors$mean_noa, 0.99)
+cut_noa_bottom <- quantile(Final_factors$mean_noa, 0.01)
+
+Final_factors <- Final_factors %>% 
+  group_by(Id) %>%  
+  mutate(outlier_beta_top = (mean_Beta >= cut_beta_top), 
+         outlier_beta_bottom = mean_Beta <= cut_beta_bottom,
+         outlier_gpa_top = (mean_gpa >= cut_gpa_top), 
+         outlier_gpa_bottom = mean_gpa <= cut_gpa_bottom,
+         outlier_mom_top = (mean_mom >= cut_mom_top), 
+         outlier_mom_bottom = mean_mom <= cut_mom_bottom,
+         outlier_bmm_top = (mean_bmm >= cut_bmm_top), 
+         outlier_bmm_bottom = mean_bmm <= cut_bmm_bottom,
+         outlier_noa_top = (mean_noa >= cut_noa_top), 
+         outlier_noa_bottom = mean_noa <= cut_noa_bottom) %>% 
+  filter(!outlier_beta_top & ! outlier_beta_bottom &
+           !outlier_gpa_top & ! outlier_gpa_bottom &
+           !outlier_noa_top & ! outlier_noa_bottom &
+           !outlier_mom_top & ! outlier_mom_bottom &
+           !outlier_bmm_top & ! outlier_bmm_bottom )
+
+# Final_factors <- Final_factors %>% select(1:12)
+# Final_factors <- data.table(Final_factors)
+
 
 Ret <- Final_factors %>%
   mutate(Exp.RET = intercept+(BM_m*bm_m)+(GPA*gpa)+
-           (MV*size)+(Momentum*mom)+
-           ifelse(country=="SGP", SGP, ifelse(country=="KOR", KOR, ifelse(country=="TWN", TWN, 0)))+
-           bm_m_dummy.x*bm_m_dummy.y+profits_dummy.x*profits_dummy.y) %>%
-  select(Id,country,ym,RET,Exp.RET) %>% as.data.table()
+           (Momentum*mom)+ sgp*SGP + kor*KOR + twn*TWN +
+           bm_m_dummy.x*bm_m_dummy.y+profits_dummy.x*profits_dummy.y) %>% 
+  select(Id,country,ym,RET.USD,Exp.RET) %>% as.data.table()
 
 Ret <- Ret %>% drop_na()
 
@@ -214,15 +255,15 @@ Ret <- Ret %>% drop_na()
 # Check Quintiles of returns and exp returns
 
 Ret <- as.data.table(Ret)
-  hlpvariable2 <- Ret[!is.na(RET)] %>%
-    group_by(country, ym) %>%
+  hlpvariable2 <- Ret[!is.na(RET)] %>% 
+    group_by(country, ym) %>% 
     summarize(bb20 = quantile(RET, probs = c(0.2), na.rm = T),
               bb40 = quantile(RET, probs = c(0.4), na.rm = T),
               bb60 = quantile(RET, probs = c(0.6), na.rm = T),
-              bb80 = quantile(RET, probs = c(0.8), na.rm = T)) %>%
+              bb80 = quantile(RET, probs = c(0.8), na.rm = T)) %>% 
     select(ym, country, bb20, bb40, bb60, bb80)
 
-
+  
 Ret <- left_join(Ret, hlpvariable2,
                  by=c("ym","country"))
 
@@ -233,12 +274,12 @@ Ret[ , pf.ret := ifelse(RET>bb80, "Big",
                                              ifelse(RET<=bb20,"Small",NA)))))]
 #Exp.Ret
 Ret <- as.data.table(Ret)
-hlpvariable2 <- Ret[!is.na(Exp.RET)] %>%
-  group_by(country, ym) %>%
+hlpvariable2 <- Ret[!is.na(Exp.RET)] %>% 
+  group_by(country, ym) %>% 
   summarize(bb20 = quantile(Exp.RET, probs = c(0.2), na.rm = T),
             bb40 = quantile(Exp.RET, probs = c(0.4), na.rm = T),
             bb60 = quantile(Exp.RET, probs = c(0.6), na.rm = T),
-            bb80 = quantile(Exp.RET, probs = c(0.8), na.rm = T)) %>%
+            bb80 = quantile(Exp.RET, probs = c(0.8), na.rm = T)) %>% 
   select(ym, country, bb20, bb40, bb60, bb80)
 
 Ret <- Ret %>% select(-bb20, -bb40, -bb60, -bb80)
@@ -254,14 +295,14 @@ Ret[ , pf.exp.ret := ifelse(Exp.RET>bb80, "Big",
 # Check Yearly average of returns and expected returns
 Ret[,year:=year(ym)]
 quarter(Ret$ym)
-Yearly_ret <- Ret %>%
+Yearly_ret <- Ret %>% 
   mutate(RET = (RET/100+1)*100,
-         Exp.RET = Exp.RET/100+1)*100 %>%
+         Exp.RET = Exp.RET/100+1)*100 %>% 
   group_by(Id,year) %>%
   summarise(RET = prod(RET)-1,
             Exp.RET = prod(Exp.RET)-1)
-
-
-
+  
+  
+  
 # Run regression
 lm(RET.USD~Exp.RET+as.factor(country), data = Ret)
