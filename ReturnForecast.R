@@ -5,53 +5,94 @@ setwd(dirname(getActiveDocumentContext()$path))
 
 # Set Date Language in English
 Sys.setlocale("LC_TIME", "C")
-source("Real_data_prep.R")
+
 source("Factors.R")
 
-# Get data from year 1994 to ensure data quality
 
 #table(small_static$INDM)
 
-# Banks, Consumer Finance, FInancial Admin., Insurance Brokers, Mortgage Finance, Investment Services,
-# Specialty Finance, Venture Capital Trust, Private Equity, Real Estate Hold, Dev, Reinsurance,
-# Life Insurance, Asset Managers
-# Exclude financial companies
+# Strongest Factors
+cross_reg <- factors %>% select(Id, ym, country, RET.USD, Beta, BM_m, bm_m_dummy,
+                                GPA, profits_dummy, NOA, MV.USD.June, Momentum) %>% 
+  drop_na(.) %>% 
+  filter(GPA != "Inf" & GPA != "-Inf" & BM_m != "-Inf" & BM_m != "Inf" & NOA != "Inf" & NOA != "-Inf")
 
-# Temporary Model: BM_m, GPA, Size, Momentum
+# Winsorize all explanatory variables at the 1st and 99th percentile
+cross_reg <- cross_reg %>%  
+  group_by(Id) %>%  
+  mutate(mean_Beta=mean(Beta), mean_gpa=mean(GPA), mean_mom=mean(Momentum),
+         mean_bmm=mean(BM_m), mean_size=mean(MV.USD.June), mean_noa=mean(NOA))
 
-# Monthly cross-sectional regression (adding a country dummy + negative earning dummies)
+cut_bmm_top <- quantile(cross_reg$mean_bmm, 0.99)
+cut_bmm_bottom <- quantile(cross_reg$mean_bmm, 0.01)
 
-cross_reg <- factors %>% 
-  select(Id, ym, RET, BM_m, bm_m_dummy, 
-         GPA, profits_dummy,
-         LMV, Momentum, country) %>% 
-  drop_na(.)
+cut_beta_top <- quantile(cross_reg$mean_Beta, 0.99)
+cut_beta_bottom <- quantile(cross_reg$mean_Beta, 0.01)
 
+cut_gpa_top <- quantile(cross_reg$mean_gpa, 0.99)
+cut_gpa_bottom <- quantile(cross_reg$mean_gpa, 0.01)
 
-cross_reg[BM_m<=0]$BM_m <- 0
-cross_reg[GPA<=0]$GPA <- 0
-#cross_reg <- cross_reg %>% mutate(BM_m = log(BM_m), GPA = log(GPA),
-                                  #LMV = log(LMV))
+cut_size_top <- quantile(cross_reg$mean_size, 0.99)
+cut_size_bottom <- quantile(cross_reg$mean_size, 0.01)
 
-#cross_reg[GPA == -Inf]$GPA <- 0
-#cross_reg[BM_m == -Inf]$BM_m <- 0
-# cross_reg <- cross_reg %>% mutate(across(where(is.numeric), log))
-#lm(RET~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy ,data=cross_reg)
+cut_mom_top <- quantile(cross_reg$mean_mom, 0.99)
+cut_mom_bottom <- quantile(cross_reg$mean_mom, 0.01)
 
-CS.reg.estimates <- cross_reg[, .(intercept=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[1],
-                                  bm_m=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[2],
-                                  gpa=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[3],
-                                  size=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[4],
-                                  mom=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[5],
-                                  KOR=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[6],
-                                  SGP=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[7],
-                                  TWN=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[8],
-                                  bm_m_dummy=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[9],
-                                  profits_dummy=lm(RET~BM_m+GPA+LMV+Momentum+as.factor(country)+bm_m_dummy+profits_dummy, na.action = na.omit)$coefficient[10],
+cut_noa_top <- quantile(cross_reg$mean_noa, 0.99)
+cut_noa_bottom <- quantile(cross_reg$mean_noa, 0.01)
+
+cross_reg <- cross_reg %>% 
+  group_by(Id) %>%  
+  mutate(outlier_beta_top = (mean_Beta >= cut_beta_top), 
+         outlier_beta_bottom = mean_Beta <= cut_beta_bottom,
+         outlier_gpa_top = (mean_gpa >= cut_gpa_top), 
+         outlier_gpa_bottom = mean_gpa <= cut_gpa_bottom,
+         outlier_mom_top = (mean_mom >= cut_mom_top), 
+         outlier_mom_bottom = mean_mom <= cut_mom_bottom,
+         outlier_bmm_top = (mean_bmm >= cut_bmm_top), 
+         outlier_bmm_bottom = mean_bmm <= cut_bmm_bottom,
+         outlier_size_top = (mean_size >= cut_size_top), 
+         outlier_size_bottom = mean_size <= cut_size_bottom,
+         outlier_noa_top = (mean_noa >= cut_noa_top), 
+         outlier_noa_bottom = mean_noa <= cut_noa_bottom) %>% 
+  filter(!outlier_beta_top & ! outlier_beta_bottom &
+           !outlier_gpa_top & ! outlier_gpa_bottom &
+           !outlier_noa_top & ! outlier_noa_bottom &
+           !outlier_mom_top & ! outlier_mom_bottom &
+           !outlier_bmm_top & ! outlier_bmm_bottom &
+           !outlier_size_top & ! outlier_size_bottom)
+
+cross_reg <- cross_reg %>% select(1:12)
+cross_reg <- data.table(cross_reg)
+
+# Set negative values for GPA and BM_m to 0
+cross_reg[GPA<0]$GPA <- 0
+cross_reg[BM_m<0]$BM_m <- 0
+
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[1],
+                                  beta=lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[2],
+                                  bm_m=lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[3],
+                                  gpa = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[4],
+                                  ag = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[5],
+                                  size = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[6],
+                                  mom = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[7],
+                                  kor = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[8],
+                                  sgp = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[9],
+                                  twn = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[10],
+                                  bm_m_dummy = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[11],
+                                  profits_dummy = lm(RET.USD~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy)$coefficient[12],
                                   no.obs=length(Id)),by=ym]
 
 
-CS.reg.estimates<-CS.reg.estimates[order(ym)]
+strongest_factor <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.estimates[, t.test(beta)]$statistic),
+                               BM_M = c(CS.reg.estimates[,t.test(bm_m)]$estimate, CS.reg.estimates[, t.test(bm_m)]$statistic),
+                               GPA = c(CS.reg.estimates[,t.test(gpa)]$estimate, CS.reg.estimates[, t.test(gpa)]$statistic),
+                               NOA = c(CS.reg.estimates[,t.test(ag)]$estimate, CS.reg.estimates[, t.test(ag)]$statistic),
+                               Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic),
+                               Mom = c(CS.reg.estimates[,t.test(mom)]$estimate, CS.reg.estimates[, t.test(mom)]$statistic))
+
+
+
 
 
 # Test with Returns in USD ---- Exact same results as RET (regarding the mean and the significance of the factors)
@@ -88,25 +129,25 @@ Rolling_Avg <- rollapplyr(data=CS.reg.estimates[,-c("ym","no.obs")], list(seq(-3
 Rolling_Avg <- cbind(Rolling_Avg, CS.reg.estimates[,c("ym")])
 
 # Test expected returns on 5FM first
-ffm_factors <- cross_reg %>% select(Id, country, ym, MV.USD.June, RET.USD, Beta, BM, OPBE, AG, op_dummy, bm_dummy)
-
-ffm_factors <- left_join(ffm_factors,
-                           Rolling_Avg,#[,-c("intercept")], 
-                           by=c("ym"))
-
-ffm_factors <- ffm_factors %>% mutate(SGP = ifelse(country == "SGP", 1, 0))
-ffm_factors <- ffm_factors %>% mutate(KOR = ifelse(country == "KOR", 1, 0))
-ffm_factors <- ffm_factors %>% mutate(TWN = ifelse(country == "TWN", 1, 0))
+# ffm_factors <- cross_reg %>% select(Id, country, ym, MV.USD.June, RET.USD, Beta, BM, OPBE, AG, op_dummy, bm_dummy)
+# 
+# ffm_factors <- left_join(ffm_factors,
+#                            Rolling_Avg,#[,-c("intercept")], 
+#                            by=c("ym"))
+# 
+# ffm_factors <- ffm_factors %>% mutate(SGP = ifelse(country == "SGP", 1, 0))
+# ffm_factors <- ffm_factors %>% mutate(KOR = ifelse(country == "KOR", 1, 0))
+# ffm_factors <- ffm_factors %>% mutate(TWN = ifelse(country == "TWN", 1, 0))
 
 
 #check <- ffm_factors %>% filter(Id == "13039P") %>% drop_na()
 
 
-Ret <- ffm_factors %>%
-  mutate(Exp.RET = intercept + (beta*Beta)+(BM*bm)+(OPBE*opbe)+(AG*ag)+(MV.USD.June*size)+
-           SGP*sgp + KOR*kor + TWN*twn + 
-           op_dummy.x * op_dummy.y + bm_dummy.x * bm_dummy.y ) %>% 
-  select(Id,country,ym,RET.USD,Exp.RET) %>% as.data.table()
+# Ret <- ffm_factors %>%
+#   mutate(Exp.RET = intercept + (beta*Beta)+(BM*bm)+(OPBE*opbe)+(AG*ag)+(MV.USD.June*size)+
+#            SGP*sgp + KOR*kor + TWN*twn + 
+#            op_dummy.x * op_dummy.y + bm_dummy.x * bm_dummy.y ) %>% 
+#   select(Id,country,ym,RET.USD,Exp.RET) %>% as.data.table()
 
 
 # Use the rolling average to forecast the returns - multiply each coefficient by the current characteristics
@@ -126,8 +167,8 @@ Final_factors <- Final_factors %>% filter(!is.infinite(GPA) & !is.infinite(BM_m)
 
 #Winsorize the data before calculating return
 
-Final_factors <- Final_factors %>%  
-  group_by(Id) %>%  
+Final_factors <- Final_factors %>%
+  group_by(Id) %>%
   mutate(mean_Beta=mean(Beta), mean_gpa=mean(GPA), mean_mom=mean(Momentum),
          mean_bmm=mean(BM_m), mean_noa=mean(NOA))
 
@@ -146,26 +187,26 @@ cut_mom_bottom <- quantile(Final_factors$mean_mom, 0.01)
 cut_noa_top <- quantile(Final_factors$mean_noa, 0.99)
 cut_noa_bottom <- quantile(Final_factors$mean_noa, 0.01)
 
-Final_factors <- Final_factors %>% 
-  group_by(Id) %>%  
-  mutate(outlier_beta_top = (mean_Beta >= cut_beta_top), 
+Final_factors <- Final_factors %>%
+  group_by(Id) %>%
+  mutate(outlier_beta_top = (mean_Beta >= cut_beta_top),
          outlier_beta_bottom = mean_Beta <= cut_beta_bottom,
-         outlier_gpa_top = (mean_gpa >= cut_gpa_top), 
+         outlier_gpa_top = (mean_gpa >= cut_gpa_top),
          outlier_gpa_bottom = mean_gpa <= cut_gpa_bottom,
-         outlier_mom_top = (mean_mom >= cut_mom_top), 
+         outlier_mom_top = (mean_mom >= cut_mom_top),
          outlier_mom_bottom = mean_mom <= cut_mom_bottom,
-         outlier_bmm_top = (mean_bmm >= cut_bmm_top), 
+         outlier_bmm_top = (mean_bmm >= cut_bmm_top),
          outlier_bmm_bottom = mean_bmm <= cut_bmm_bottom,
-         outlier_noa_top = (mean_noa >= cut_noa_top), 
-         outlier_noa_bottom = mean_noa <= cut_noa_bottom) %>% 
+         outlier_noa_top = (mean_noa >= cut_noa_top),
+         outlier_noa_bottom = mean_noa <= cut_noa_bottom) %>%
   filter(!outlier_beta_top & ! outlier_beta_bottom &
            !outlier_gpa_top & ! outlier_gpa_bottom &
            !outlier_noa_top & ! outlier_noa_bottom &
            !outlier_mom_top & ! outlier_mom_bottom &
            !outlier_bmm_top & ! outlier_bmm_bottom )
 
-# Final_factors <- Final_factors %>% select(1:12)
-# Final_factors <- data.table(Final_factors)
+#Final_factors <- Final_factors %>% select(1:12)
+#Final_factors <- data.table(Final_factors)
 
 
 Ret <- Final_factors %>%
@@ -188,45 +229,45 @@ Ret <- Ret %>% drop_na()
 #              bb80 = quantile(RET, probs = c(0.8), na.rm = T)) %>% 
 #    select(ym, country, bb20, bb40, bb60, bb80)
 
-  
-Ret <- left_join(Ret, hlpvariable2,
-                 by=c("ym","country"))
+#   
+# Ret <- left_join(Ret, hlpvariable2,
+#                  by=c("ym","country"))
 
 #Ret[ , pf.ret := ifelse(RET>bb80, "Big",
 #                        ifelse((RET<=bb80 & RET>bb60),"LessBig",
 #                               ifelse((RET<=bb60 & RET>bb40),"Neutral",
 #                                      ifelse((RET<=bb40 & RET>bb20),"LessSmall",
-                                             ifelse(RET<=bb20,"Small",NA)))))]
+                                             #ifelse(RET<=bb20,"Small",NA)))))]
 
 #Exp.Ret
-Ret <- as.data.table(Ret)
-hlpvariable2 <- Ret[!is.na(Exp.RET)] %>% 
-  group_by(country, ym) %>% 
-  summarize(bb20 = quantile(Exp.RET, probs = c(0.2), na.rm = T),
-            bb40 = quantile(Exp.RET, probs = c(0.4), na.rm = T),
-            bb60 = quantile(Exp.RET, probs = c(0.6), na.rm = T),
-            bb80 = quantile(Exp.RET, probs = c(0.8), na.rm = T)) %>% 
-  select(ym, country, bb20, bb40, bb60, bb80)
-
-Ret <- Ret %>% select(-bb20, -bb40, -bb60, -bb80)
-Ret <- left_join(Ret, hlpvariable2,
-                 by=c("ym","country"))
-
-Ret[ , pf.exp.ret := ifelse(Exp.RET>bb80, "Big",
-                        ifelse((Exp.RET<=bb80 & Exp.RET>bb60),"LessBig",
-                               ifelse((Exp.RET<=bb60 & Exp.RET>bb40),"Neutral",
-                                      ifelse((Exp.RET<=bb40 & Exp.RET>bb20),"LessSmall",
-                                             ifelse(Exp.RET<=bb20,"Small",NA)))))]
+# Ret <- as.data.table(Ret)
+# hlpvariable2 <- Ret[!is.na(Exp.RET)] %>% 
+#   group_by(country, ym) %>% 
+#   summarize(bb20 = quantile(Exp.RET, probs = c(0.2), na.rm = T),
+#             bb40 = quantile(Exp.RET, probs = c(0.4), na.rm = T),
+#             bb60 = quantile(Exp.RET, probs = c(0.6), na.rm = T),
+#             bb80 = quantile(Exp.RET, probs = c(0.8), na.rm = T)) %>% 
+#   select(ym, country, bb20, bb40, bb60, bb80)
+# 
+# Ret <- Ret %>% select(-bb20, -bb40, -bb60, -bb80)
+# Ret <- left_join(Ret, hlpvariable2,
+#                  by=c("ym","country"))
+# 
+# Ret[ , pf.exp.ret := ifelse(Exp.RET>bb80, "Big",
+#                         ifelse((Exp.RET<=bb80 & Exp.RET>bb60),"LessBig",
+#                                ifelse((Exp.RET<=bb60 & Exp.RET>bb40),"Neutral",
+#                                       ifelse((Exp.RET<=bb40 & Exp.RET>bb20),"LessSmall",
+#                                              ifelse(Exp.RET<=bb20,"Small",NA)))))]
 
 # Check Yearly average of returns and expected returns
-Ret[,year:=year(ym)]
-quarter(Ret$ym)
-Yearly_ret <- Ret %>% 
-  mutate(RET = (RET/100+1)*100,
-         Exp.RET = Exp.RET/100+1)*100 %>% 
-  group_by(Id,year) %>%
-  summarise(RET = prod(RET)-1,
-            Exp.RET = prod(Exp.RET)-1)
+# Ret[,year:=year(ym)]
+# quarter(Ret$ym)
+# Yearly_ret <- Ret %>% 
+#   mutate(RET = (RET/100+1)*100,
+#          Exp.RET = Exp.RET/100+1)*100 %>% 
+#   group_by(Id,year) %>%
+#   summarise(RET = prod(RET)-1,
+#             Exp.RET = prod(Exp.RET)-1)
   
   
   

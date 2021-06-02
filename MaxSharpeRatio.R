@@ -12,7 +12,9 @@ library(rstudioapi)
 setwd (dirname(getActiveDocumentContext()$path)) 
 
 source("Real_data_prep.R")
-load("FF Monthly.CSV")
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"))
 #source("ReturnForecast.R")
 
 # Reconstruction date -> July of each year
@@ -42,10 +44,10 @@ for (y in Years_list){
   
   Cov_spread <- Cov_prep %>%  spread(Id, Excess.RET) %>% select(-ym)
   
-  Ret <- Ret %>% filter(ym >= as.yearmon(paste0("Jul", year(as.yearmon(y)))) &
+  Ret_temp <- Ret %>% filter(ym >= as.yearmon(paste0("Jul", year(as.yearmon(y)))) &
                    ym < (as.yearmon(paste0("Jul", year(as.yearmon(y))))+1) &  # Check that forecasted returns for delisted 
                    Id %in% Investable_Ids$Id & Id %in% Exist_in_July$Id) %>%  # stocks do not get deleted
-    mutate(RET = (RET+1)) %>% 
+    mutate(RET = (Exp.RET+1)) %>% 
     group_by(Id) %>% 
     summarise(RET = prod(RET))
   
