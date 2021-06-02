@@ -35,10 +35,11 @@ write.csv(Years_list, file = file.path("Min_Var","Years_list.csv"))
 for (y in Years_list){
   print(y)
   Cov_prep <- stocks %>% mutate(Excess.RET = RET/100-RF) %>% select(Id,ym,Excess.RET, MV, pf.size)
+  Investable_Ids <- stocks %>% filter(ym == as.yearmon(paste0("Jun", year(as.yearmon(y)))) & pf.size=="Big" & !is.na(RET))
+  Exist_in_July <- stocks %>% filter(ym == as.yearmon(paste0("Jul", year(as.yearmon(y)))) & !is.na(RET))
   Cov_prep <- Cov_prep %>% filter(ym < as.yearmon(paste0("Jul", year(as.yearmon(y)))) & 
-                                    ym >= (as.yearmon(paste0("Jul", year(as.yearmon(y))))-36/12) &
-                                    pf.size=="Big") %>% # Filtering only for big stocks
-    arrange(ym,-MV) %>% select(-pf.size,-MV) # Still not selecting the first 1000 by market cap
+                                    ym >= (as.yearmon(paste0("Jul", year(as.yearmon(y))))-36/12)) %>% 
+    arrange(ym,-MV) %>% filter(Id %in% Investable_Ids$Id & Id %in% Exist_in_July$Id) %>% select(-pf.size,-MV) # Still not selecting the first 1000 by market cap
  
  Cov_spread <- Cov_prep %>%  spread(Id, Excess.RET) %>% select(-ym)
  
@@ -54,7 +55,7 @@ for (y in Years_list){
  write.csv(cov_m, file = file.path("Min_Var",paste0("cov_",y,".csv")))
  }
 }
-rm(y)
+rm(y, cov_m, Cov_prep, Cov_spread)
 
 
 ###########################################################
@@ -73,7 +74,10 @@ for (y in Years_list){
     #assign(paste0("Weight_",y),read_csv(file.path("Min_Var",paste0("weights_", y,".csv"))))
     
     Weight <- read_csv(file.path("Min_Var",paste0("weights_", y,".csv")))
-    Weight <- Weight %>% rename("Id" = Row) %>% mutate(Id = as.character(Id))
+    # Normalizing weights (as weights of 10^-5 and lower have been set to 0)
+    Weight <- Weight %>% rename("Id" = Row) %>% mutate(Id = as.character(Id), 
+                                                       x_vect = x_vect/sum(x_vect)) %>% 
+      arrange(-x_vect)
     #print(y)
     #print(nrow(Weight))
     #print("\n")
@@ -85,10 +89,11 @@ for (y in Years_list){
                ym < (as.yearmon(paste0("Jul", year(as.yearmon(y))))+1))
     stocks_ret <- stocks_ret %>% filter(Id %in% Weight$Id) %>% mutate(RET = (RET/100+1)) %>% 
       group_by(Id) %>% 
-      summarise(Ret = prod(RET)) %>% mutate(Ret = Ret-1)
+      summarise(Ret = prod(RET, na.rm = T)) %>% mutate(Ret = Ret-1)
     portfolio <- left_join(Weight, stocks_ret, by="Id")
+    portfolio <- portfolio %>% arrange(-x_vect)
     #portfolio_ret <- portfolio %>% 
-    portfolio_ret <- weighted.mean(x = portfolio$Ret,w = portfolio$x_vect, na.rm = T)
+    portfolio_ret <- weighted.mean(x = portfolio$Ret,w = portfolio$x_vect)
     portfolio_ret <- as.data.frame(cbind(y, portfolio_ret))
     Portfolio_Returns <- as.data.table(rbind(Portfolio_Returns, portfolio_ret))
       
@@ -105,26 +110,29 @@ Portfolio_Returns <- Portfolio_Returns %>% arrange(y) %>%
   mutate(ret = 1+portfolio_ret) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Portfolio_Returns$Portfolio_Value[1] <- 100
 
-# Calculate Market Portfolio Return for the same time-frane
-source("FAT_RM.R")
-Market_Portfolio_FAT <- as.data.table(Market_Portfolio_FAT)
-Market_Portfolio_FAT[,y:=year(ym)]
-Market_Portfolio_FAT[,m := month(ym)]
-Market_Portfolio_FAT <- Market_Portfolio_FAT %>% filter(ym>="Jul 1995")
-Market_Portfolio_FAT[, hcjun := ifelse(m>=7, y, y-1)]
-
-Market_Ret <- Market_Portfolio_FAT %>% mutate(RM = (RM/100+1)) %>% 
-  group_by(hcjun) %>% summarise(Market_Ret = prod(RM)) %>% 
-  mutate(Market_Ret = Market_Ret-1) %>% rename("y" = hcjun)
-Market_Ret <- Market_Ret %>% arrange(y) %>% 
-  mutate(ret = 1+Market_Ret) %>% mutate(Market_Portfolio = 100*lag(cumprod(ret)))
-Market_Ret$Market_Portfolio[1] <- 100
-Market_Ret <- Market_Ret %>% select(y, Value_Market)
-Portfolio_Returns <- left_join(Portfolio_Returns,
-                               Market_Ret,
-                               by = "y")
-
-
-# Plot Minimum Variance against the Market Return
-plot(x = Portfolio_Returns$y, y = Portfolio_Returns$Portfolio_Value, type = "l", lty=1, ylim=c(50,17000))
-lines(x = Portfolio_Returns$y, y = Portfolio_Returns$Market_Portfolio, lty=2)
+# Calculate Market Portfolio Return for the same time-frame - 
+#
+#Is something wrong in the market returns??
+#
+# source("FAT_RM.R")
+# Market_Portfolio_FAT <- as.data.table(Market_Portfolio_FAT)
+# Market_Portfolio_FAT[,y:=year(ym)]
+# Market_Portfolio_FAT[,m := month(ym)]
+# Market_Portfolio_FAT <- Market_Portfolio_FAT %>% filter(ym>="Jul 1995")
+# Market_Portfolio_FAT[, hcjun := ifelse(m>=7, y, y-1)]
+# 
+# Market_Ret <- Market_Portfolio_FAT %>% mutate(RM = (RM/100+1)) %>% 
+#   group_by(hcjun) %>% summarise(Market_Ret = prod(RM)) %>% 
+#   mutate(Market_Ret = Market_Ret-1) %>% rename("y" = hcjun)
+# Market_Ret <- Market_Ret %>% arrange(y) %>% 
+#   mutate(ret = 1+Market_Ret) %>% mutate(Market_Portfolio = 100*lag(cumprod(ret)))
+# Market_Ret$Market_Portfolio[1] <- 100
+# Market_Ret <- Market_Ret %>% select(y, Value_Market)
+# Portfolio_Returns <- left_join(Portfolio_Returns,
+#                                Market_Ret,
+#                                by = "y")
+# # Try with Beta RData
+# 
+# # Plot Minimum Variance against the Market Return
+# plot(x = Portfolio_Returns$y, y = Portfolio_Returns$Portfolio_Value, type = "l", lty=1)#, ylim=c(50,170000))
+# lines(x = Portfolio_Returns$y, y = Portfolio_Returns$Market_Portfolio.y, lty=2)
