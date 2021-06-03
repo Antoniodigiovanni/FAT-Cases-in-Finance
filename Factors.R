@@ -34,6 +34,9 @@ rm(Beta_36_M)
 # OPBE  Ratio is WRONG
 # We have to first set the NA Values to 0 and then we can use it in the calculation
 factors <- all_data
+# Drop the observations that have NA for RET since this is our dependent variable in the Regressions
+factors <- factors %>% drop_na(RET)
+# Now we set the Worldscope variables to zero if they are NA
 factors <- factors %>% replace(is.na(.), 0)
 
 factors <- factors %>% mutate(
@@ -99,8 +102,20 @@ Momentum <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>%
 
 Momentum <- Momentum %>% mutate(Momentum = (Momentum-1))
 
+Momentum_short <- all_data %>% group_by(Id) %>% mutate(RET.adj = RET/100 + 1) %>% 
+  do(cbind(reg_col = select(., RET.adj) %>% 
+             rollapplyr(list(seq(-6, -2)), prod, by.column = FALSE, fill = NA),
+           date_col = select(., Date))) %>% 
+  ungroup() %>% rename("Momentum_short" = reg_col)
+
+Momentum_short <- Momentum_short %>% mutate(Momentum_short = (Momentum_short-1))
+
 factors <- left_join(factors,
                      Momentum,
+                     by=c("Id", "Date"))
+
+factors <- left_join(factors,
+                     Momentum_short,
                      by=c("Id", "Date"))
 
 rm(Momentum)
