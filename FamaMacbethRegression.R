@@ -1140,7 +1140,7 @@ CS.reg.estimates <- cross_reg[, .(intercept=lm(RET~Beta+BM_m+GPA+NOA+MV.USD.June
                                   twn = lm(RET~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy)$coefficient[10],
                                   bm_m_dummy = lm(RET~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy)$coefficient[11],
                                   profits_dummy = lm(RET~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy)$coefficient[12],
-                                  profits_dummy = lm(RET~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy)$coefficient[13],
+                                  noa_dummy = lm(RET~Beta+BM_m+GPA+NOA+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+profits_dummy+noa_dummy)$coefficient[13],
                                   no.obs=length(Id)),by=ym]
 
 
@@ -1151,6 +1151,7 @@ strongest_factor <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate
                      Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic),
                      Mom = c(CS.reg.estimates[,t.test(mom)]$estimate, CS.reg.estimates[, t.test(mom)]$statistic))
 
+CS.strongest.candidates <- CS.reg.estimates
 
 #Strongest vs 5-Factor
 cross_reg <- factors %>% 
