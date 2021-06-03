@@ -12,7 +12,9 @@ library(rstudioapi)
 setwd (dirname(getActiveDocumentContext()$path)) 
 
 source("Real_data_prep.R")
-source("FAT_RM.R")
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"))
 
 # Reconstruction date -> July of each year
 # We select the first N=1000 stocks for each year and calculate the covariance 
@@ -22,7 +24,7 @@ source("FAT_RM.R")
 # Stocks selection
 stocks <- all_data %>% select(Id, country, Date, ym, year, month, RET, MV, pf.size)
 stocks <- left_join(stocks,
-                    Market_Portfolio_FAT[,c("ym","RF")],
+                    FF[,c("ym","RF")],
                     by="ym")
 
 
