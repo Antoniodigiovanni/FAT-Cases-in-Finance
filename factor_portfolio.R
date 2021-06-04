@@ -84,11 +84,11 @@ MD <- -min(Eq_factor_portfolio$ret)
 
 # This wasnt so good now try MV Weighted
 total_mv_yearly <- inv_universe %>% group_by(ym) %>% 
-  summarise(mv_total = sum(MV.USD))
+  summarise(mv_total = sum(LMV.USD))
 vw_port <- merge(inv_universe, total_mv_yearly, by = "ym")
 # Weights are calculated by MV
 vw_port <- vw_port %>% group_by(ym)  %>%  
-  mutate(weights = MV.USD / mv_total,
+  mutate(weights = LMV.USD / mv_total,
          weights = ifelse(weights < 0.0001, 0, weights),
          weights = weights / sum(weights),
           cum_weights = cumsum(weights),
@@ -172,19 +172,19 @@ factor_port <- factors
 # Removes all the Inf observations
 factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
 factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Dec 1999") %>% 
-  select(Id, country, MV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
+  select(Id, country, LMV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
   filter(across(everything(), ~ !is.na(.x))) %>% arrange(ym)
 
 total_mv_yearly <- factor_port %>% group_by(ym) %>% 
-  summarise(mv_total = sum(MV.USD))
+  summarise(mv_total = sum(LMV.USD))
 mpf <- merge(factor_port, total_mv_yearly, by = "ym")
 mpf <- mpf %>% group_by(ym)  %>%  
-  mutate(weights = MV.USD / mv_total,
+  mutate(weights = LMV.USD / mv_total,
          cum_weights = cumsum(weights),
          weighted_return = weights * RET.USD)
 
 cum_return_mpf <- mpf %>% group_by(ym) %>% summarise(yearly_ret = sum(weighted_return)) %>% drop_na()
-cum_return_mpf <- cum_return_mpf %>% mutate(Ret = (yearly_ret/100+1)) %>% summarise(Ret = prod(Ret) -1) 
+ 
 
 Portfolio_Returns <- cum_return_mpf %>% arrange(ym) %>%
   mutate(ret = 1+yearly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
@@ -213,22 +213,4 @@ Portfolio_Returns <- test_port %>% arrange(ym) %>%
 Portfolio_Returns$Portfolio_Value[1] <- 100
 
 
-portfolio_returns <- test_port %>% group_by(ym) %>% summarize(ret.port = weighted.mean(RET.USD,
-                                                                                       MV.USD))
 
-
-portfolio_returns <- panel_country[!is.na(pf.size) & !is.na(pf.bm)] %>% # this operator nests functions
-  group_by(Date,SIZE_VALUE) %>% # do "everything" for the groups specified here
-  summarize(ret.port = weighted.mean(RET.USD,
-                                     LMV.USD)) %>% # vw returns using lagged mcap
-  spread(SIZE_VALUE,ret.port) %>% # create one column for each group
-  mutate(
-    Small = (Small.High + Small.Neutral + Small.Low)/3, # just exemplary
-    Big = (Big.High + Big.Neutral + Big.Low)/3,
-    SMB = Small-Big,
-    High = (Small.High + Big.High)/2,
-    Low = (Small.Low + Big.Low)/2,
-    HML = High-Low
-  )
-
-portfolio_returns <- as.data.table(portfolio_returns)
