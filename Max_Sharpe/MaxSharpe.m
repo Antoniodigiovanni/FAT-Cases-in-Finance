@@ -6,9 +6,10 @@ Years = sort(Years);
 
 
 
-%for i=1:length(Years)
- %   Year = Years(i);
-    Year=2014
+for i=1:length(Years)
+    Year = Years(i);
+    Year
+    %Year=2008;
     % Add a try-catch as some years will not be present.
 try
     cov_m = readtable(strcat('cov_',string(Year),'.csv'), 'ReadRowNames',true, 'ReadVariableNames', true); %csvread('cov_m.csv',1,1);
@@ -33,10 +34,10 @@ a=sum(a)/2;
 
 %Ops = sdpsettings ('solver','gurobi', '', 'verbose', 1);
 %Res = optimize(Cons, -Obj, Ops);
-fun = @(x)(-(transpose(x)*Ret)./(transpose(x)*cov_m*x));
+fun = @(x)(-(transpose(x)*Ret)./sqrt((transpose(x)*cov_m*x)));
 %years 2008,2014 need lower optimality tolerance due to large duration of
 %calculation
-options = optimoptions(@fmincon,'MaxFunctionEvaluations',10000000, 'MaxIterations',100000,'OptimalityTolerance',0.1);
+options = optimoptions(@fmincon, 'MaxFunctionEvaluations',10000000, 'MaxIterations',100000,'OptimalityTolerance',0.0001,'StepTolerance', 1.0000e-6);
 
 
 %fun=@SharpeRatio;
@@ -45,7 +46,7 @@ b= [];
 Aeq =ones(1,a);
 beq =1;
 lb = zeros(a,1);
-ub = ones(a,1);
+ub = ones(a,1)*0.05;
 x0_0=zeros(a,1);
 x_0_0(1,:)=1;
 x0 = x0_0;
@@ -61,7 +62,7 @@ writetable(x_t, strcat('weights_',string(Year),'.csv'), 'Delimiter', ',', 'Quote
 catch ME
     warning('Error');
 end
-%end
+end
 
 
 function [c,ceq] = ncol(x)

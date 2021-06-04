@@ -52,7 +52,6 @@ for (y in Years_list){
     mutate(RET = (Exp.RET+1)) %>% 
     group_by(Id) %>% 
     summarise(RET = prod(RET))
-  
   # We require the stock to have 36 returns in the timeframe of 36 months,
   # so if a column has at least one NA for this timeframe, we drop it
   Cov_spread <- Filter(function(x)!any(is.na(x)), Cov_spread)
@@ -63,7 +62,7 @@ for (y in Years_list){
   Cov_spread_transpose <- as.data.frame(t(Cov_spread))
   Cov_spread_transpose<- Cov_spread_transpose %>% filter(row.names(Cov_spread_transpose) %in% Ret_t$Id)
   Cov_spread_t <- as.data.frame(t(Cov_spread_transpose))
-  
+
   if (!is_empty(Cov_spread_t) & !is.empty(Ret_t)){
     cov_m <- cov(Cov_spread_t, use = "pairwise.complete.obs")
     cov_m <- as.data.frame(cov_m)
@@ -71,8 +70,10 @@ for (y in Years_list){
     write.csv(cov_m, file = file.path("Max_Sharpe",paste0("cov_",y,".csv")))
   }
   
+  
+  
 }
-#rm(y, cov_m, Cov_prep, Cov_spread)
+rm(y, cov_m, Cov_prep, Cov_spread)
 
 
 
@@ -93,9 +94,15 @@ for (y in Years_list){
     
     Weight <- read_csv(file.path("Max_Sharpe",paste0("weights_", y,".csv")))
     # Normalizing weights (as weights of 10^-5 and lower have been set to 0)
-    Weight <- Weight %>% rename("Id" = Row) %>% mutate(Id = as.character(Id), 
-                                                       x_vect = x_vect/sum(x_vect)) %>% 
-      arrange(-x_vect)
+    #Weight <-as.data.frame(Weight)
+    
+    #Weight <- Weight %>% rename(Id =  %>% mutate(Id = as.character(Id), 
+    #                                                   x_vect = x_vect/sum(x_vect)) %>% 
+    #  arrange(-x_vect)
+    names(Weight)[names(Weight)=="Row"] <- c("Id")
+    Weight <- Weight%>% mutate(Id = as.character(Id), 
+                                                 x_vect = x_vect/sum(x_vect)) %>% 
+                                                   arrange(-x_vect)
     #print(y)
     #print(nrow(Weight))
     #print("\n")
@@ -111,7 +118,7 @@ for (y in Years_list){
     portfolio <- left_join(Weight, stocks_ret, by="Id")
     portfolio <- portfolio %>% arrange(-x_vect)
     #portfolio_ret <- portfolio %>% 
-    portfolio_ret <- weighted.mean(x = portfolio$Ret,w = portfolio$x_vect)
+    portfolio_ret <- sum(portfolio$Ret*portfolio$x_vect, na.rm=TRUE)
     portfolio_ret <- as.data.frame(cbind(y, portfolio_ret))
     Portfolio_Returns <- as.data.table(rbind(Portfolio_Returns, portfolio_ret))
     
