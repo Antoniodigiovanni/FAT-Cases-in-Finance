@@ -76,6 +76,20 @@ MD <- -min(Portfolio_Returns$ret)
 
 # Sharpe Ratio
 
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
+         Year = year(ym))
+FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF)) 
+SR<-Portfolio_Returns
+SR<-merge(SR, FF, by.x=c("y"), by.y=c("Year"))
+SR <- SR%>% mutate(TRF = 100*lag(cumprod(YRF)))
+SR$TRF[1] <- 100
+CumRF <- tail(SR$TRF,n=1)/100
+CumPR <- tail(SR$Portfolio_Value,n=1)/100
+SharpeRatio <- (CumPR-CumRF)/sd(SR$portfolio_ret)
+
+
 #Return (Average arithmetic return(annualized) as a percentage)
 # SD (standard deviation (annualized))
 

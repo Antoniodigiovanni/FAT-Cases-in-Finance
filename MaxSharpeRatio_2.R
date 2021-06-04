@@ -6,7 +6,7 @@
 ################################################################################
 
 library(rstudioapi)
-library(rapportools)
+#library(rapportools)
 
 # Set the working directory to the script directory
 setwd (dirname(getActiveDocumentContext()$path)) 
@@ -129,5 +129,6 @@ for (y in Years_list){
 Portfolio_Returns <- Portfolio_Returns %>% arrange(y) %>%
   mutate(ret = 1+portfolio_ret) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Portfolio_Returns$Portfolio_Value[1] <- 100
+write_csv(Portfolio_Returns,"Portfolio_Returns_SR.csv")
 
 
