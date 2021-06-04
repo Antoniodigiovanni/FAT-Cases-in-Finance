@@ -85,6 +85,8 @@ rm(y, cov_m, Cov_prep, Cov_spread)
 
 # Afterwards load the csv files with the optimal weights.
 Portfolio_Returns <- data.table()
+meanWeights <- as.data.frame(matrix(nrow = length(Years_list)-1,
+                                ncol = 2))
 for (y in Years_list){
   
   # Loading Portfolio Weights
@@ -103,6 +105,13 @@ for (y in Years_list){
     Weight <- Weight%>% mutate(Id = as.character(Id), 
                                                  x_vect = x_vect/sum(x_vect)) %>% 
                                                    arrange(-x_vect)
+    
+    
+    #for portfolio concentration
+    top10 <- Weight %>% arrange(desc(x_vect)) %>% slice_head(n = 10)
+    
+    meanWeights[y-1994,1]<-y
+    meanWeights[y-1994,2]<- top10 %>% summarise(mean(x_vect))
     #print(y)
     #print(nrow(Weight))
     #print("\n")
@@ -126,9 +135,24 @@ for (y in Years_list){
   
 }
 
-Portfolio_Returns <- Portfolio_Returns %>% arrange(y) %>%
+Portfolio_Returns_SR <- Portfolio_Returns %>% arrange(y) %>%
   mutate(ret = 1+portfolio_ret) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
-Portfolio_Returns$Portfolio_Value[1] <- 100
-write_csv(Portfolio_Returns,"Portfolio_Returns_SR.csv")
+Portfolio_Returns_SR$Portfolio_Value[1] <- 100
+#write_csv(Portfolio_Returns,"Portfolio_Returns_SR.csv")
+
+##Calculate the Sharpe Ratio
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
+         Year = year(ym))
+FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF)) 
+SR<-Portfolio_Returns
+SR<-merge(SR, FF, by.x=c("y"), by.y=c("Year"))
+SR <- SR%>% mutate(TRF = 100*lag(cumprod(YRF)))
+SR$TRF[1] <- 100
+CumRF <- tail(SR$TRF,n=1)/100
+CumPR <- tail(SR$Portfolio_Value,n=1)/100
+Vol <- sd(SR$portfolio_ret)
+SharpeRatio <- (CumPR-CumRF)/sd(SR$portfolio_ret)
 
 
