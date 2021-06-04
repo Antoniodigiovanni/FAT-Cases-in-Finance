@@ -85,7 +85,7 @@ factors <- factors %>% mutate(
   QuickRatio = (WC02201 - WC02101) / WC03101,
   NSI=adjustedEquity-lagAdjustedEquity
 ) %>% 
-  select(Id, country.x, Date, month, year, LMV, MV.USD, MV.USD.June, RET.USD, RET, Beta, ym,
+  select(Id, country.x, Date, month, year, LMV, LMV.USD, MV.USD, MV.USD.June, RET.USD, RET, Beta, ym,
          BM, BM_m, bm_dummy, bm_m_dummy, EP, EP_m, earnings_dummy, earnings_m_dummy, CP, CP_m, cashflow_dummy, cashflow_m_dummy, ROE, ROA, GPA, profits_dummy,
          OPBE, op_dummy, OA, OL, NOA, AG, ItA, NSI,
          EPS, eps_dummy, TEY, tey_dummy, BookToEV, DtoE, QuickRatio, noa_dummy, oa_dummy, pf.size, hcjun) %>% 

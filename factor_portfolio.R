@@ -1,71 +1,234 @@
-test <- factors
-test <- test %>% filter(BM_m != "Inf" & BM_m != "-Inf" & GPA != "Inf" & GPA != "-Inf" & pf.size == "Big") %>% 
-  select(Id, country, Date, MV.USD, RET.USD, RET, ym, BM_m, GPA, pf.size)
+factor_port <- factors
+# Removes all the Inf observations
+factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
+factor_port <- factor_port %>% filter(pf.size == "Big") %>% 
+  select(Id, country, LMV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
+  filter(across(everything(), ~ !is.na(.x)))
 #test <- test %>% mutate(fac_score = 0.5*BM_m + 0.5*GPA) %>% group_by(ym) %>%
   #summarise(n_obs = n()) %>% arrange(fac_score) %>% drop_na()
 
-test <- test %>% mutate(fac_score = 0.5*BM_m + 0.5*GPA) %>% group_by(ym) %>% arrange(desc(fac_score)) %>% 
+# Factors that are included in the model
+fac <- c("Beta", "BM_m", "GPA", "NOA", "Momentum")
+N <- length(fac)
+
+# Equal weighting of the factors
+# Not sure if minus beta and minus NOA is correct
+factor_port <- factor_port %>% mutate(fac_score = 1/N*-Beta + 1/N*BM_m + 1/N*GPA + 1/N*-NOA + 1/N*Momentum) %>% 
+  group_by(ym) %>% arrange(ym, desc(fac_score)) %>% 
   filter(ym > "Dec 1999" & !is.nan(fac_score))
 
-counts <- test %>% summarise(n_obs = n())
+counts <- factor_port %>% summarise(n_obs = n())
 
-test <- merge(test, counts, by="ym")
+factor_port <- merge(factor_port, counts, by="ym")
 
-quint <- test %>% group_by(ym) %>% summarize(top20 = quantile(fac_score, probs = c(0.2), na.rm = T),
+quint <- factor_port %>% group_by(ym) %>% summarize(top20 = quantile(fac_score, probs = c(0.2), na.rm = T),
                             top40 = quantile(fac_score, probs = c(0.4), na.rm = T),
                             top60 = quantile(fac_score, probs = c(0.6), na.rm = T),
                             top80 = quantile(fac_score, probs = c(0.8), na.rm = T)) %>% 
   select(ym, top20, top40, top60, top80)
 
-test <- merge(test, quint, by = "ym")
+factor_port <- merge(factor_port, quint, by = "ym")
 
-test <- data.table(test)
+factor_port <- data.table(factor_port)
 
-test <- test[ , bucket := ifelse(fac_score>top80, 1,
+factor_port <- factor_port[ , bucket := ifelse(fac_score>top80, 1,
                         ifelse(fac_score<=top80 & fac_score>top60,2,
                                ifelse(fac_score<=top60 & fac_score>top40,3,
                                       ifelse(fac_score<=top40 & fac_score>top20,4,
                                              ifelse(fac_score<=top20,5,NA)))))]
 
 
-inv_universe <- test %>% filter(bucket == 1) %>% group_by(ym) %>% arrange(ym, desc(fac_score)) %>% select(-n_obs)
+inv_universe <- factor_port %>% filter(bucket == 1) %>% group_by(ym) %>% arrange(ym, desc(fac_score)) %>% select(-n_obs)
 univ_count <- inv_universe %>% summarise(n_obs = n())
 inv_universe <- merge(inv_universe, univ_count)
 
 
-check <- inv_universe %>% group_by(ym) %>%  mutate(weights = 1 / n_obs)
-# First equal weights
-check <- check %>% mutate(weighted_return = weights*RET)
-cum_return <- check %>% group_by(ym) %>% summarise(yearly_ret = sum(weighted_return))
 
-cum_return <- cum_return %>% mutate(Ret = (yearly_ret/100+1)) %>% summarise(Ret = prod(Ret) - 1)
+# Only invest in the first bucket and do equal weighting
+eq_port <- inv_universe %>% group_by(ym) %>%  mutate(weights = 1 / n_obs)
+eq_port <- eq_port %>% mutate(weighted_return = weights*RET)
+eq_cumreturn <- eq_port %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_return))
+Eq_factor_portfolio <- eq_cumreturn %>% arrange(ym) %>%
+  mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+Eq_factor_portfolio$Portfolio_Value[1] <- 100
+
+# Yearly turnover (as per Hanauer, Lauterbach (2019))
+Weights_df <- eq_port %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
+Weights_df <- Weights_df %>% replace(is.na(.),0)
+T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
+transposed_Weights <- as.data.frame(t(Weights_df))
+names(transposed_Weights) <- Weights_df$Id
+transposed_Weights <- transposed_Weights[-1,]
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.factor), as.character))
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.character), as.numeric))
+to <- function(weight){
+  result <- abs(lead(weight) - weight)
+}
+Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
+Turnover <- sum(Turnover_df)/(2*T)
+
+# Effective N (as per Hanauer, Lauterbach (2019))
+eN <- function(weight){
+  result <- ((weight)^2)
+}
+Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
+inverse <- function(weight){
+  result <- 1/weight
+}
+Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N <- Effective_N/T
+
+# Maximum Drawdown
+
+MD <- -min(Eq_factor_portfolio$ret)
 
 # This wasnt so good now try MV Weighted
 total_mv_yearly <- inv_universe %>% group_by(ym) %>% 
   summarise(mv_total = sum(MV.USD))
-check <- merge(inv_universe, total_mv_yearly, by = "ym")
+vw_port <- merge(inv_universe, total_mv_yearly, by = "ym")
 # Weights are calculated by MV
-check <- check %>% group_by(ym)  %>%  
+vw_port <- vw_port %>% group_by(ym)  %>%  
   mutate(weights = MV.USD / mv_total,
          weights = ifelse(weights < 0.0001, 0, weights),
          weights = weights / sum(weights),
           cum_weights = cumsum(weights),
          weighted_return = weights * RET.USD)
 
-cum_return_vw <- check %>% group_by(ym) %>% summarise(yearly_ret = sum(weighted_return)) %>% drop_na()
-cum_return_vw <- cum_return_vw %>% mutate(Ret = (yearly_ret/100+1)) %>% summarise(Ret = prod(Ret) - 1)
+cum_return_vw <- vw_port %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_return)) %>% drop_na()
+VW_Factor_Portfolio <- cum_return_vw %>% arrange(ym) %>%
+  mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+VW_Factor_Portfolio$Portfolio_Value[1] <- 100
+
+# Yearly turnover (as per Hanauer, Lauterbach (2019))
+Weights_df <- vw_port %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
+Weights_df <- Weights_df %>% replace(is.na(.),0)
+T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
+transposed_Weights <- as.data.frame(t(Weights_df))
+names(transposed_Weights) <- Weights_df$Id
+transposed_Weights <- transposed_Weights[-1,]
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.factor), as.character))
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.character), as.numeric))
+to <- function(weight){
+  result <- abs(lead(weight) - weight)
+}
+Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
+Turnover <- sum(Turnover_df)/(2*T)
+
+# Effective N (as per Hanauer, Lauterbach (2019))
+eN <- function(weight){
+  result <- ((weight)^2)
+}
+Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
+inverse <- function(weight){
+  result <- 1/weight
+}
+Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N <- Effective_N/T
+
+top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
+top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
+mean(top10$avg_weight)
+
+# Maximum Drawdown
+
+MD <- -min(VW_Factor_Portfolio$ret)
+
 
 
 # Lets try fac_score weighted
 total_fac_score <- inv_universe %>% group_by(ym) %>% summarise(fac_total = sum(fac_score))
-check <- merge(inv_universe, total_fac_score, by = "ym")
-check <- check %>% group_by(ym)  %>%  
+fac_weighted <- merge(inv_universe, total_fac_score, by = "ym")
+fac_weighted <- fac_weighted %>% group_by(ym)  %>%  
   mutate(weights = fac_score / fac_total,
          weights = ifelse(weights < 0.0001, 0, weights),
          weights = weights / sum(weights),
          cum_weights = cumsum(weights),
          weighted_return = weights * RET.USD)
 
-cum_return_fs <- check %>% group_by(ym) %>% summarise(yearly_ret = sum(weighted_return)) %>% drop_na()
-cum_return_fs <- cum_return_fs %>% mutate(Ret = (yearly_ret/100+1)) %>% summarise(Ret = prod(Ret) - 1)
+cum_return_fs <- fac_weighted %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_return)) %>% drop_na()
+Fac_weighted_Portfolio <- cum_return_fs %>% arrange(ym) %>%
+  mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+Fac_weighted_Portfolio$Portfolio_Value[1] <- 100
 
+# Next try z-transformation of the factors
+factor_port <- factors
+# Removes all the Inf observations
+factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
+factor_port <- factor_port %>% filter(pf.size == "Big") %>% 
+  select(Id, country, MV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
+  filter(across(everything(), ~ !is.na(.x)))
+
+factor_port <- factor_port %>% mutate(mean_beta = mean(Beta),
+                                      mean_bm = mean(BM_m),
+                                      mean_gpa = mean(GPA),
+                                      mean_noa = mean(NOA),
+                                      mean_mom = mean(Momentum),
+                                      )
+
+
+
+# Check MV return of all stocks
+factor_port <- factors
+# Removes all the Inf observations
+factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
+factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Dec 1999") %>% 
+  select(Id, country, MV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
+  filter(across(everything(), ~ !is.na(.x))) %>% arrange(ym)
+
+total_mv_yearly <- factor_port %>% group_by(ym) %>% 
+  summarise(mv_total = sum(MV.USD))
+mpf <- merge(factor_port, total_mv_yearly, by = "ym")
+mpf <- mpf %>% group_by(ym)  %>%  
+  mutate(weights = MV.USD / mv_total,
+         cum_weights = cumsum(weights),
+         weighted_return = weights * RET.USD)
+
+cum_return_mpf <- mpf %>% group_by(ym) %>% summarise(yearly_ret = sum(weighted_return)) %>% drop_na()
+cum_return_mpf <- cum_return_mpf %>% mutate(Ret = (yearly_ret/100+1)) %>% summarise(Ret = prod(Ret) -1) 
+
+Portfolio_Returns <- cum_return_mpf %>% arrange(ym) %>%
+  mutate(ret = 1+yearly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+Portfolio_Returns$Portfolio_Value[1] <- 100
+
+Portfolio_Returns_vw <- cum_return_vw %>% arrange(ym) %>%
+  mutate(ret = 1+yearly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+Portfolio_Returns$Portfolio_Value[1] <- 100
+
+total_mv_yearly <- test_port %>% group_by(ym) %>% 
+  summarise(mv_total = sum(MV.USD))
+test_port <- merge(test_port, total_mv_yearly, by = "ym")
+test_port <- test_port %>% group_by(ym)  %>%  
+  mutate(weights = MV.USD / mv_total,
+         cum_weights = cumsum(weights),
+         weighted_return = weights * RET.USD)
+
+test <- test_port %>% group_by(ym) %>% summarise(monthly_return = mean(RET.USD))
+test2 <- test_port %>% group_by(ym) %>% summarise(monthly_weighted_return = mean(weighted_return))
+
+test_return <- test_port %>% group_by(ym) %>% summarise(yearly_ret = sum(weighted_return))
+cum_return_mpf <- cum_return_mpf %>% mutate(Ret = (yearly_ret/100+1)) %>% summarise(Ret = prod(Ret) -1) 
+
+Portfolio_Returns <- test_port %>% arrange(ym) %>%
+  mutate(ret = 1+yearly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+Portfolio_Returns$Portfolio_Value[1] <- 100
+
+
+portfolio_returns <- test_port %>% group_by(ym) %>% summarize(ret.port = weighted.mean(RET.USD,
+                                                                                       MV.USD))
+
+
+portfolio_returns <- panel_country[!is.na(pf.size) & !is.na(pf.bm)] %>% # this operator nests functions
+  group_by(Date,SIZE_VALUE) %>% # do "everything" for the groups specified here
+  summarize(ret.port = weighted.mean(RET.USD,
+                                     LMV.USD)) %>% # vw returns using lagged mcap
+  spread(SIZE_VALUE,ret.port) %>% # create one column for each group
+  mutate(
+    Small = (Small.High + Small.Neutral + Small.Low)/3, # just exemplary
+    Big = (Big.High + Big.Neutral + Big.Low)/3,
+    SMB = Small-Big,
+    High = (Small.High + Big.High)/2,
+    Low = (Small.Low + Big.Low)/2,
+    HML = High-Low
+  )
+
+portfolio_returns <- as.data.table(portfolio_returns)
