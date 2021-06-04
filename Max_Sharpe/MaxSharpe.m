@@ -37,7 +37,7 @@ a=sum(a)/2;
 fun = @(x)(-(transpose(x)*Ret)./sqrt((transpose(x)*cov_m*x)));
 %years 2008,2014 need lower optimality tolerance due to large duration of
 %calculation
-options = optimoptions(@fmincon, 'MaxFunctionEvaluations',10000000, 'MaxIterations',100000,'OptimalityTolerance',0.0001,'StepTolerance', 1.0000e-6);
+options = optimoptions(@fmincon, 'MaxFunctionEvaluations',10000000, 'MaxIterations',100000,'OptimalityTolerance',0.00001,'StepTolerance', 1.0000e-6);
 
 
 %fun=@SharpeRatio;
@@ -55,7 +55,7 @@ x = fmincon(fun,x0,A,b,Aeq,beq,lb,ub,nonlcon, options);
 
 
 x_vect = value(x);
-x_vect(x_vect<0.000009)=0;
+x_vect(x_vect<0.0001)=0;
 x_t = array2table(x_vect,'RowNames', Ids);
 writetable(x_t, strcat('weights_',string(Year),'.csv'), 'Delimiter', ',', 'QuoteStrings',true, 'WriteRowNames', true);
 

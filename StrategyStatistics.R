@@ -87,7 +87,7 @@ SR <- SR%>% mutate(TRF = 100*lag(cumprod(YRF)))
 SR$TRF[1] <- 100
 CumRF <- tail(SR$TRF,n=1)/100
 CumPR <- tail(SR$Portfolio_Value,n=1)/100
-Vol <- 
+Vol <- sd(SR$portfolio_ret)
 SharpeRatio <- (CumPR-CumRF)/sd(SR$portfolio_ret)
 
 
