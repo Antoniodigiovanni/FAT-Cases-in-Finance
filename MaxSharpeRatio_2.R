@@ -88,6 +88,8 @@ Portfolio_Returns <- data.table()
 Std_Deviation <- data.table()
 meanWeights <- as.data.frame(matrix(nrow = length(Years_list)-1,
                                 ncol = 2))
+NumberOfStock <-as.data.frame(matrix(nrow = length(Years_list)-1,
+                                     ncol = 2))
 for (y in Years_list){
   
   # Loading Portfolio Weights
@@ -113,9 +115,13 @@ for (y in Years_list){
     
     meanWeights[y-1994,1]<-y
     meanWeights[y-1994,2]<- top10 %>% summarise(mean(x_vect))
-    #print(y)
-    #print(nrow(Weight))
-    #print("\n")
+    
+    #Number of stocks per year in Portfolio
+   
+    NumberOfStock[y-1994,1]<-y
+    hlp <- Weight %>% filter(x_vect>0)
+    NumberOfStock[y-1994,2]<-nrow(hlp)
+    rm(hlp)
     
     # Perform calculations on portfolios or create some df with all the Ids and the
     # weights for each year ...
@@ -178,6 +184,10 @@ names(SharpeRatio)[names(SharpeRatio)=="mean(SR$Sharpe_Ratio)"]<-c("SharpeRatio"
 Volatility <- as.data.frame(sd(SR$portfolio_ret))
 names(Volatility)[names(Volatility)=="sd(SR$portfolio_ret)"] <- c("Volatility")
 
+#Annualized Return
+AR<-as.data.frame(mean(SR$portfolio_ret)*100)
+colnames(AR)[1]<-"Annualized Return"
+
 #Concentration
 Concentration <- as.data.frame(mean(meanWeights$V2))
 names(Concentration)[names(Concentration)=="mean(meanWeights$V2)"] <- c("Concentration")
@@ -208,7 +218,7 @@ names(Concentration)[names(Concentration)=="mean(meanWeights$V2)"] <- c("Concent
 
 Results_SR <- merge(Volatility, Concentration)
 Results_SR <- merge(Results_SR, SharpeRatio)
-
+Results_SR <- merge(Results_SR, AR)
 
 
 ###Creating the Weight df
@@ -271,14 +281,44 @@ Results_SR <- merge(Results_SR, Effective_N)
 
 
 #Max Drawdown
-MD <- as.data.frame(-min(Portfolio_Returns_SR$portfolio_ret))
+MD <- as.data.frame(-min(Portfolio_Returns_SR$portfolio_ret)*100)
 colnames(MD)[1] <- "MD"
 Results_SR <- merge(Results_SR, MD)
 
+#Total Cummultated Return
+TCR <- as.data.frame(tail(Portfolio_Returns_SR$Portfolio_Value,n=1))
+colnames(TCR)[1]<-"Total Cum. Return"
+Results_SR <- merge(Results_SR, TCR)
+
+#Avg Number of Stocks
+avgStocks <- as.data.frame(mean(NumberOfStock$V2))
+colnames(avgStocks)[1]<-"avg. Number of stocks"
+Results_SR <- merge(Results_SR, avgStocks)
+
+#Information Ratio
+source("MSCI.R")
+MP <- MSCI_weighted
+colnames(MP)[2]<-"YMR"
+IR<-Portfolio_Returns_SR
+IR<-merge(IR, MP, by.x=c("y"), by.y=c("year"))
+IR <- left_join(IR, Std_Deviation, by="y") %>% mutate(YMR = YMR - 1)
+IR <- IR %>% mutate(InfRatio= (portfolio_ret-YMR)/Std)
+InfRatio <- as.data.frame(mean(IR$InfRatio))
+colnames(InfRatio)[1]<-"Information Ratio"
+Results_SR <- merge(Results_SR, InfRatio)
+
+#Tracking Error
+retPeriods <- 2018-1995+1-1
+IR$help <-IR$portfolio_ret-IR$YMR
+TE <- as.data.frame(sqrt(sum((IR$help)^2)/retPeriods)*100)
+colnames(TE)[1]<-"TrackingError"
+Results_SR <- merge(Results_SR, TE)
+
+                           
 
 
 
 
 
-
+rownames(Results_SR)[1]<-"SRM-Portfolio"
 #rm(y,Weight,top10,stocks_ret,stocks_temp,Std_Dev,Std_Deviation,SR,SharpeRatio,Portfolio_monthly_RET,Portfolio_Returns, portfolio, meanWeights,FF,Volatility, Concentration,stocks)
