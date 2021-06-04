@@ -73,7 +73,7 @@ for (y in Years_list){
   
   
 }
-rm(y, cov_m, Cov_prep, Cov_spread)
+rm(y, cov_m, Cov_prep, Cov_spread,Exist_in_July,Investable_Ids)
 
 
 
@@ -108,7 +108,7 @@ for (y in Years_list){
                                                    arrange(-x_vect)
     
     
-    #for portfolio concentration
+    #for portfolio concentration,Top 10
     top10 <- Weight %>% arrange(desc(x_vect)) %>% slice_head(n = 10)
     
     meanWeights[y-1994,1]<-y
@@ -127,7 +127,7 @@ for (y in Years_list){
       group_by(Id) %>% 
       summarise(Ret = prod(RET, na.rm = T)) %>% mutate(Ret = Ret-1)
     
-    # Calculate annualized mean monthly excess return and annualized standard dev.
+    # Calculate annualized mean monthly excess return, return and annualized standard dev.
     
     stocks_temp <- stocks_temp %>% mutate(Excess_RET = (RET-RF)/100)
     stocks_temp <- left_join(stocks_temp, Weight,
@@ -161,7 +161,7 @@ Portfolio_Returns_SR <- Portfolio_Returns %>% arrange(y) %>%
 Portfolio_Returns_SR$Portfolio_Value[1] <- 100
 #write_csv(Portfolio_Returns,"Portfolio_Returns_SR.csv")
 
-##Calculate the Sharpe Ratio using the mean of the yearly Sharpe Ratio
+##Calculate the Sharpe Ratio using the mean of the yearly Sharpe Ratio, i.e. the mean of annual returns divided by the annual std.dev.
 FF <- read_csv("FF Monthly.CSV") %>% 
   rename(ym = X1) %>%  
   mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
@@ -171,7 +171,19 @@ SR<-Portfolio_Returns_SR
 SR<-merge(SR, FF, by.x=c("y"), by.y=c("Year"))
 SR <- left_join(SR, Std_Deviation, by="y") %>% mutate(YRF = YRF - 1)
 SR <- SR %>% mutate(Sharpe_Ratio = (portfolio_ret-YRF)/Std)
-mean(SR$Sharpe_Ratio)
+SharpeRatio <- as.data.frame(mean(SR$Sharpe_Ratio))
+names(SharpeRatio)[names(SharpeRatio)=="mean(SR$Sharpe_Ratio)"]<-c("SharpeRatio")
+
+##Volatility
+Volatility <- as.data.frame(sd(SR$portfolio_ret))
+names(Volatility)[names(Volatility)=="sd(SR$portfolio_ret)"] <- c("Volatility")
+
+#Concentration
+Concentration <- as.data.frame(mean(meanWeights$V2))
+names(Concentration)[names(Concentration)=="mean(meanWeights$V2)"] <- c("Concentration")
+
+#years <- 2018-1995+1
+#Volatility2 <- mean(Std_Deviation$Std)*sqrt(years)
 
 #Cumulative Risk Free rate return
 # SR <- SR %>% arrange(y) %>%
@@ -191,10 +203,82 @@ mean(SR$Sharpe_Ratio)
 # years <- 2018-1995+1
 # CumPR <- CumPR^(1/years)
 # CumRF <- CumRF^(1/years)
-# Vol <- mean(SR$Std)*sqrt(years)
+#Vol <- mean(SR$Std)*sqrt(years)
 # SharpeRatio <- (CumPR-CumRF)/Vol
 
+Results_SR <- merge(Volatility, Concentration)
+Results_SR <- merge(Results_SR, SharpeRatio)
+
+
+
+###Creating the Weight df
+Years_list <- read_csv(file.path("Max_Sharpe", "Years_list.csv")) %>% 
+  select(x) %>% arrange(x) %>% 
+  as.list() %>% unlist()
+Weights_df <- data.table()
+j <- 0
+for (y in Years_list){
+  tryCatch({
+    # Create one df for each year with the following line
+    #assign(paste0("Weight_",y),read_csv(file.path("Min_Var",paste0("weights_", y,".csv"))))
+    print(y)
+    Weight <- read_csv(file.path("Max_Sharpe",paste0("weights_", y,".csv")))
+    # Normalizing weights (as weights of 10^-5 and lower have been set to 0)
+    Weight <- Weight %>% rename("Id" = Row) %>% 
+      mutate(Id = as.character(Id),
+             x_vect = x_vect/sum(x_vect)) %>% 
+      arrange(-x_vect)
+    
+    if (j == 0) {
+      Weights_df <- Weight
+      names(Weights_df)[names(Weights_df) == "x_vect"] <- y
+    } else {
+      Weights_df <- full_join(Weights_df, Weight, by="Id")
+      names(Weights_df)[names(Weights_df) == "x_vect"] <- y
+    }
+    
+    j = j+1 
+  }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+# Portfolio Figures calculation
+Weights_df[is.na(Weights_df)] <- 0
+
+# Yearly turnover (as per Hanauer, Lauterbach (2019))
+T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
+transposed_Weights <- as.data.frame(t(Weights_df))
+names(transposed_Weights) <- Weights_df$Id
+transposed_Weights <- transposed_Weights[-1,]
+to <- function(weight){
+  result <- abs(as.numeric(lead(weight)) - as.numeric(weight))
+}
+Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
+Turnover <- as.data.frame(sum(Turnover_df)/(2*T))
+colnames(Turnover)[1]<-"Turnover"
+Results_SR <- merge(Results_SR, Turnover)
+
+# Effective N (as per Hanauer, Lauterbach (2019))
+eN <- function(weight){
+  result <- (as.numeric(weight)^2)
+}
+Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
+inverse <- function(weight){
+  result <- 1/weight
+}
+Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N <- as.data.frame(Effective_N/T)
+colnames(Effective_N)[1]<-"Effective_N"
+Results_SR <- merge(Results_SR, Effective_N)
+
+
+#Max Drawdown
+MD <- as.data.frame(-min(Portfolio_Returns_SR$portfolio_ret))
+colnames(MD)[1] <- "MD"
+Results_SR <- merge(Results_SR, MD)
 
 
 
 
+
+
+
+#rm(y,Weight,top10,stocks_ret,stocks_temp,Std_Dev,Std_Deviation,SR,SharpeRatio,Portfolio_monthly_RET,Portfolio_Returns, portfolio, meanWeights,FF,Volatility, Concentration,stocks)

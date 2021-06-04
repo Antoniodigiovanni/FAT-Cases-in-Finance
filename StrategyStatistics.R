@@ -97,4 +97,4 @@ SharpeRatio <- (CumPR-CumRF)/sd(SR$portfolio_ret)
 # Tracking Error (to the value weighted portfolio)
 
 #concentration
-Concentration <- mean(meanWeights$V2)*100
+
