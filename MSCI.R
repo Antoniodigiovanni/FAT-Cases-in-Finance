@@ -40,7 +40,7 @@ MSCI_monthly <- MSCI_monthly %>% mutate(HKG = HKG * HKG_w, TAI = TAI * TWN_w, SG
   mutate(MSCI_ret = TAI+HKG+SGP+KOR-1)%>%
   select(Date, MSCI_ret, year)
 
-MSCI_monthly_std <- MSCI_monthly %>% group_by(year)%>%summarise(std=sd(MSCI_ret))
+MSCI_monthly_std <- MSCI_monthly %>% group_by(year)%>%summarise(std=sd(MSCI_ret)*sqrt(12))
 
 #Volatility <- sd(MSCI_monthly$MSCI_ret)
 #How we approached at the portfolios:
