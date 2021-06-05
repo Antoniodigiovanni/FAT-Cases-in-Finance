@@ -1,5 +1,5 @@
-library(PortfolioAnalytics)
-require(DEoptim)
+#library(PortfolioAnalytics)
+#require(DEoptim)
 library(rstudioapi)
 
 # Set the working directory to the script directory
@@ -231,6 +231,10 @@ top10 <- top10 %>% summarise(avg_weight = mean(weights))
 mean(top10$avg_weight)
 
 # Now try the MV but limit maximum weights to 10%
+total_mv_yearly <- inv_universe %>% group_by(ym) %>% 
+  summarise(mv_total = sum(LMV.USD))
+vw_port <- merge(inv_universe, total_mv_yearly, by = "ym")
+
 vw_port <- vw_port %>% group_by(ym)  %>%  
   mutate(weights = LMV.USD / mv_total)
 # weights = ifelse(weights < 0.0001, 0, weights),
@@ -261,7 +265,7 @@ while (max(vw_temp$weights) > Weight_limit) {
   
   
 }
-vw_port <- rbind(vw_temp, vw_final)
+vw_port <- rbind(vw_temp, vw_checked)
 
 rm(vw_temp, vw_checked)
 
