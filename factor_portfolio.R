@@ -1,3 +1,7 @@
+library(PortfolioAnalytics)
+require(DEoptim)
+
+
 factor_port <- factors
 # Removes all the Inf observations
 factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
@@ -226,9 +230,37 @@ mean(top10$avg_weight)
 total_mv_yearly <- inv_universe %>% group_by(ym) %>% 
   summarise(mv_total = sum(LMV.USD))
 vw_port <- merge(inv_universe, total_mv_yearly, by = "ym")
+vw_port <- vw_port %>% group_by(ym) %>% 
+  mutate(weights = LMV.USD / mv_total, cum_weights = cumsum(weights))
+
+test <- vw_port %>% filter(ym == "Jul 1995")
+
+pspec <- portfolio.spec(assets = test$Id, weight_seq = test$weights)
+pspec <- add.constraint(portfolio = pspec,
+                        type = "weight_sum",
+                        min_sum = 1,
+                        max_sum = 1)
+pspec <- add.constraint(portfolio = pspec,
+                        type = "box",
+                        min_sum = 0.0001,
+                        max_sum = 0.10)
+
+maxret <- add.objective(portfolio = pspec, type = "return", name = "mean")
+opt_maxret <- optimize.portfolio(R)
+print.default(pspec)
+
 # Weights are calculated by MV
-test <- vw_port %>% select(RET, LMV.)
-test <- portfolio.optim(vw_port$RET, reshigh = 0.10)
+test <- vw_port %>% mutate(year = year(ym)) %>% filter(year == "2000")
+test <- test %>% ungroup %>% select(Id, RET) %>% group_by(Id) %>% mutate(i1 = row_number()) %>% 
+  spread(Id, RET) %>% select(-i1)
+test <- vw_port %>% group_by(Id) %>% mutate(year = year(ym)) %>% 
+  filter(year == "2000")  %>% select(Id, RET) %>% spread(Id, RET)
+averet <- matrix(colMeans(test, na.rm = T), nrow = 1)
+rcov = cov(test, use = "pairwise.complete.obs")
+target.return = 15/250
+port.sol <- portfolio.optim(x = averet, pm = target.return, covmat = rcov)
+
+
 vw_port <- vw_port %>% group_by(ym)  %>%  
   mutate(weights = LMV.USD / mv_total,
          weights = ifelse(weights < 0.0001, 0, weights),
