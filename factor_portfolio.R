@@ -1,6 +1,10 @@
 library(PortfolioAnalytics)
 require(DEoptim)
+library(rstudioapi)
 
+# Set the working directory to the script directory
+setwd (dirname(getActiveDocumentContext()$path)) 
+source("Factors.R")
 
 factor_port <- factors
 # Removes all the Inf observations
@@ -227,47 +231,42 @@ top10 <- top10 %>% summarise(avg_weight = mean(weights))
 mean(top10$avg_weight)
 
 # Now try the MV but limit maximum weights to 10%
-total_mv_yearly <- inv_universe %>% group_by(ym) %>% 
-  summarise(mv_total = sum(LMV.USD))
-vw_port <- merge(inv_universe, total_mv_yearly, by = "ym")
-vw_port <- vw_port %>% group_by(ym) %>% 
-  mutate(weights = LMV.USD / mv_total, cum_weights = cumsum(weights))
-
-test <- vw_port %>% filter(ym == "Jul 1995")
-
-pspec <- portfolio.spec(assets = test$Id, weight_seq = test$weights)
-pspec <- add.constraint(portfolio = pspec,
-                        type = "weight_sum",
-                        min_sum = 1,
-                        max_sum = 1)
-pspec <- add.constraint(portfolio = pspec,
-                        type = "box",
-                        min_sum = 0.0001,
-                        max_sum = 0.10)
-
-maxret <- add.objective(portfolio = pspec, type = "return", name = "mean")
-opt_maxret <- optimize.portfolio(R)
-print.default(pspec)
-
-# Weights are calculated by MV
-test <- vw_port %>% mutate(year = year(ym)) %>% filter(year == "2000")
-test <- test %>% ungroup %>% select(Id, RET) %>% group_by(Id) %>% mutate(i1 = row_number()) %>% 
-  spread(Id, RET) %>% select(-i1)
-test <- vw_port %>% group_by(Id) %>% mutate(year = year(ym)) %>% 
-  filter(year == "2000")  %>% select(Id, RET) %>% spread(Id, RET)
-averet <- matrix(colMeans(test, na.rm = T), nrow = 1)
-rcov = cov(test, use = "pairwise.complete.obs")
-target.return = 15/250
-port.sol <- portfolio.optim(x = averet, pm = target.return, covmat = rcov)
-
-
 vw_port <- vw_port %>% group_by(ym)  %>%  
-  mutate(weights = LMV.USD / mv_total,
-         weights = ifelse(weights < 0.0001, 0, weights),
-         weights = ifelse(weights > 0.10, 0.10, weights),
-         
-         cum_weights = cumsum(weights),
-         weighted_return = weights * RET.USD)
+  mutate(weights = LMV.USD / mv_total)
+# weights = ifelse(weights < 0.0001, 0, weights),
+# weights = ifelse(weights > 0.10, 0.10, weights),
+# cum_weights = cumsum(weights),
+# weighted_return = weights * RET.USD)
+
+
+# Limiting weights to 10%
+Weight_limit <- 0.1
+vw_temp <- vw_port
+vw_checked <- data.frame()
+
+while (max(vw_temp$weights) > Weight_limit) {
+  vw_big <- vw_temp %>% group_by(ym) %>% filter(weights>=Weight_limit) %>% 
+    mutate(weights = 0.1)
+  vw_checked <- rbind(vw_checked, vw_big)
+  nBigWeight <- vw_checked %>% group_by(ym) %>% count() %>% rename(number = "n")
+  vw_temp <- left_join(vw_temp, nBigWeight, by="ym") %>% mutate(number = ifelse(is.na(number), 0, number))
+  vw_temp <- vw_temp %>% 
+    filter(weights < Weight_limit) 
+  vw_temp <- vw_temp %>%
+    group_by(ym) %>% 
+    mutate(mv_total = sum(LMV.USD)) #%>% 
+  vw_temp <- vw_temp %>%
+    mutate(weights = LMV.USD / mv_total * (1-Weight_limit*number)) %>% 
+    select(-c("number"))
+  
+  
+}
+vw_port <- rbind(vw_temp, vw_final)
+
+rm(vw_temp, vw_checked)
+
+vw_port <- vw_port %>% mutate(weighted_return = weights * RET.USD)
+
 
 cum_return_vw <- vw_port %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_return)) %>% drop_na()
 VW_Factor_Portfolio <- cum_return_vw %>% arrange(ym) %>%
