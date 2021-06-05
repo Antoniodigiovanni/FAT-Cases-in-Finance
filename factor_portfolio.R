@@ -345,7 +345,7 @@ factor_port <- factor_port %>% mutate(mean_beta = mean(Beta),
 factor_port <- factors
 # Removes all the Inf observations
 factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
-factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Dec 1999") %>% 
+factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Jun 1995") %>% 
   select(Id, country, LMV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
   filter(across(everything(), ~ !is.na(.x))) %>% arrange(ym)
 
@@ -357,11 +357,11 @@ mpf <- mpf %>% group_by(ym)  %>%
          cum_weights = cumsum(weights),
          weighted_return = weights * RET.USD)
 
-cum_return_mpf <- mpf %>% group_by(ym) %>% summarise(yearly_ret = sum(weighted_return)) %>% drop_na()
+cum_return_mpf <- mpf %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_return)) %>% drop_na()
  
 
 Portfolio_Returns <- cum_return_mpf %>% arrange(ym) %>%
-  mutate(ret = 1+yearly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+  mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Portfolio_Returns$Portfolio_Value[1] <- 100
 
 # Yearly turnover (as per Hanauer, Lauterbach (2019))
@@ -396,13 +396,13 @@ FF <- read_csv("FF Monthly.CSV") %>%
   mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
          Year = year(ym))
 FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF))
-VW_Factor_Portfolio <- VW_Factor_Portfolio %>% mutate(Year = year(ym))
-sd_dev <- sd(VW_Factor_Portfolio$monthly_ret)*sqrt(12)
-Yearly_ret <- VW_Factor_Portfolio %>% group_by(Year) %>% summarise(Yret = prod(ret))
+Portfolio_Returns <- Portfolio_Returns %>% mutate(Year = year(ym))
+sd_dev <- sd(Portfolio_Returns$monthly_ret)*sqrt(12)
+Yearly_ret <- Portfolio_Returns %>% group_by(Year) %>% summarise(Yret = prod(ret))
 Yearly_ret <- merge(Yearly_ret, FF, by = "Year")
-SR_vw <- Yearly_ret
-SR_vw <- SR_vw %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
-SR_vw <- SR_vw %>% mutate(sharpe_ratio = (ret-rf)/sd)
+SR_market <- Yearly_ret
+SR_market <- SR_market %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
+SR_market <- SR_market %>% mutate(sharpe_ratio = (ret-rf)/sd)
 
 top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
 top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
