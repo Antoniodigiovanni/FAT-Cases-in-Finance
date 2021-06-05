@@ -1,6 +1,7 @@
 clear;
 Years = readmatrix('Years_list.csv');
 Years = Years(:,2);
+
 for i=1:length(Years)
     Year = Years(i)
     % Add a try-catch as some years will not be present.

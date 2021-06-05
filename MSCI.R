@@ -3,6 +3,7 @@ library(zoo)
 library(rstudioapi)
 library(tidyverse)
 library(rlang)
+library(readxl)
 source("Real_data_prep.R")
 MSCI_Country_Returns <- read_excel("MSCI Country Returns.xls")
 

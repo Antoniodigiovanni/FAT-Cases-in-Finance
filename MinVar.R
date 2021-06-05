@@ -68,6 +68,11 @@ rm(y, cov_m, Cov_prep, Cov_spread)
 
 # Afterwards load the csv files with the optimal weights.
 Portfolio_Returns <- data.table()
+Std_Deviation <- data.table()
+meanWeights <- as.data.frame(matrix(nrow = length(Years_list)-1,
+                                    ncol = 2))
+NumberOfStock <-as.data.frame(matrix(nrow = length(Years_list)-1,
+                                     ncol = 2))
 for (y in Years_list){
 
   # Loading Portfolio Weights
@@ -83,21 +88,55 @@ for (y in Years_list){
     #print(y)
     #print(nrow(Weight))
     #print("\n")
+    
+    
+    #for portfolio concentration,Top 10
+    top10 <- Weight %>% arrange(desc(x_vect)) %>% slice_head(n = 10)
+    
+    meanWeights[y-1994,1]<-y
+    meanWeights[y-1994,2]<- top10 %>% summarise(mean(x_vect))
+    
+    #Number of stocks per year in Portfolio
+    
+    NumberOfStock[y-1994,1]<-y
+    hlp <- Weight %>% filter(x_vect>0)
+    NumberOfStock[y-1994,2]<-nrow(hlp)
+    rm(hlp)
+    
 
     # Perform calculations on portfolios or create some df with all the Ids and the
     # weights for each year ...
     stocks_ret <- stocks %>% 
       filter(ym >= as.yearmon(paste0("Jul", year(as.yearmon(y)))) &
                ym < (as.yearmon(paste0("Jul", year(as.yearmon(y))))+1))
+    stocks_temp <- stocks_ret
     stocks_ret <- stocks_ret %>% filter(Id %in% Weight$Id) %>% mutate(RET = (RET/100+1)) %>% 
       group_by(Id) %>% 
       summarise(Ret = prod(RET, na.rm = T)) %>% mutate(Ret = Ret-1)
+    
+    # Calculate annualized mean monthly excess return, return and annualized standard dev.
+    
+    stocks_temp <- stocks_temp %>% mutate(Excess_RET = (RET-RF)/100)
+    stocks_temp <- left_join(stocks_temp, Weight,
+                             by="Id")
+    Portfolio_monthly_RET <- stocks_temp %>% group_by(ym) %>% 
+      summarise(Portfolio_Excess_RET = sum(Excess_RET * x_vect, na.rm = T),
+                Port_RET = sum(RET/100 * x_vect, na.rm = T))
+    
+   
+    
+    Std_Dev <- Portfolio_monthly_RET %>% summarise(Std = sd(Port_RET)*sqrt(12))
+    
     portfolio <- left_join(Weight, stocks_ret, by="Id")
     portfolio <- portfolio %>% arrange(-x_vect)
-    #portfolio_ret <- portfolio %>% 
+
     portfolio_ret <- weighted.mean(x = portfolio$Ret,w = portfolio$x_vect)
     portfolio_ret <- as.data.frame(cbind(y, portfolio_ret))
     Portfolio_Returns <- as.data.table(rbind(Portfolio_Returns, portfolio_ret))
+    
+    Std_Dev <- as.data.frame(cbind(y, Std_Dev))
+    Std_Deviation <- as.data.table(rbind(Std_Deviation, Std_Dev))
+    
       
 }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
 
@@ -108,33 +147,167 @@ for (y in Years_list){
 #   mutate(ret = 1+portfolio_ret, Value=100) %>% mutate(cumproduct = cumprod(ret)) %>% mutate(Value = lag(Value)*lag(cumproduct))
 # Portfolio_Returns$Value[1] <- 100
 
-Portfolio_Returns <- Portfolio_Returns %>% arrange(y) %>%
+Portfolio_Returns_SR <- Portfolio_Returns %>% arrange(y) %>%
   mutate(ret = 1+portfolio_ret) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
-Portfolio_Returns$Portfolio_Value[1] <- 100
+Portfolio_Returns_SR$Portfolio_Value[1] <- 100
+#write_csv(Portfolio_Returns,"Portfolio_Returns_SR.csv")
 
-# Calculate Market Portfolio Return for the same time-frame - 
-#
-#Is something wrong in the market returns??
-#
-# source("FAT_RM.R")
-# Market_Portfolio_FAT <- as.data.table(Market_Portfolio_FAT)
-# Market_Portfolio_FAT[,y:=year(ym)]
-# Market_Portfolio_FAT[,m := month(ym)]
-# Market_Portfolio_FAT <- Market_Portfolio_FAT %>% filter(ym>="Jul 1995")
-# Market_Portfolio_FAT[, hcjun := ifelse(m>=7, y, y-1)]
+##Calculate the Sharpe Ratio using the mean of the yearly Sharpe Ratio, i.e. the mean of annual returns divided by the annual std.dev.
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
+         Year = year(ym))
+FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF)) 
+SR<-Portfolio_Returns_SR
+SR<-merge(SR, FF, by.x=c("y"), by.y=c("Year"))
+SR <- left_join(SR, Std_Deviation, by="y") %>% mutate(YRF = YRF - 1)
+SR <- SR %>% mutate(Sharpe_Ratio = (portfolio_ret-YRF)/Std)
+SharpeRatio <- as.data.frame(mean(SR$Sharpe_Ratio))
+names(SharpeRatio)[names(SharpeRatio)=="mean(SR$Sharpe_Ratio)"]<-c("SharpeRatio")
+
+##Volatility
+Volatility <- as.data.frame(sd(SR$portfolio_ret))
+names(Volatility)[names(Volatility)=="sd(SR$portfolio_ret)"] <- c("Volatility")
+
+#Annualized Return
+AR<-as.data.frame(mean(SR$portfolio_ret)*100)
+colnames(AR)[1]<-"Annualized Return"
+
+#Concentration
+Concentration <- as.data.frame(mean(meanWeights$V2))
+names(Concentration)[names(Concentration)=="mean(meanWeights$V2)"] <- c("Concentration")
+
+#years <- 2018-1995+1
+#Volatility2 <- mean(Std_Deviation$Std)*sqrt(years)
+
+#Cumulative Risk Free rate return
+# SR <- SR %>% arrange(y) %>%
+#   mutate(ret = 1+YREF) %>% mutate(RF_Value = 100*lag(cumprod(ret)))
+# Portfolio_Returns_SR$Portfolio_Value[1] <- 100
+
+# Sharpe Ratio calculated annualizing the cumulative return and risk free rate
+
+# SR <- SR%>% mutate(TRF = 100*lag(cumprod(YRF)))
+# SR$TRF[1] <- 100
+# CumRF <- tail(SR$TRF,n=1)/100
+# CumPR <- tail(SR$Portfolio_Value,n=1)/100
+# Vol <- sd(SR$portfolio_ret)
+# SharpeRatio <- (CumPR-CumRF)/sd(SR$portfolio_ret)
 # 
-# Market_Ret <- Market_Portfolio_FAT %>% mutate(RM = (RM/100+1)) %>% 
-#   group_by(hcjun) %>% summarise(Market_Ret = prod(RM)) %>% 
-#   mutate(Market_Ret = Market_Ret-1) %>% rename("y" = hcjun)
-# Market_Ret <- Market_Ret %>% arrange(y) %>% 
-#   mutate(ret = 1+Market_Ret) %>% mutate(Market_Portfolio = 100*lag(cumprod(ret)))
-# Market_Ret$Market_Portfolio[1] <- 100
-# Market_Ret <- Market_Ret %>% select(y, Value_Market)
-# Portfolio_Returns <- left_join(Portfolio_Returns,
-#                                Market_Ret,
-#                                by = "y")
-# # Try with Beta RData
 # 
-# # Plot Minimum Variance against the Market Return
-# plot(x = Portfolio_Returns$y, y = Portfolio_Returns$Portfolio_Value, type = "l", lty=1)#, ylim=c(50,170000))
-# lines(x = Portfolio_Returns$y, y = Portfolio_Returns$Market_Portfolio.y, lty=2)
+# years <- 2018-1995+1
+# CumPR <- CumPR^(1/years)
+# CumRF <- CumRF^(1/years)
+#Vol <- mean(SR$Std)*sqrt(years)
+# SharpeRatio <- (CumPR-CumRF)/Vol
+
+Results_SR <- merge(Volatility, Concentration)
+Results_SR <- merge(Results_SR, SharpeRatio)
+Results_SR <- merge(Results_SR, AR)
+
+
+###Creating the Weight df
+Years_list <- read_csv(file.path("Max_Sharpe", "Years_list.csv")) %>% 
+  select(x) %>% arrange(x) %>% 
+  as.list() %>% unlist()
+Weights_df <- data.table()
+j <- 0
+for (y in Years_list){
+  tryCatch({
+    # Create one df for each year with the following line
+    #assign(paste0("Weight_",y),read_csv(file.path("Min_Var",paste0("weights_", y,".csv"))))
+    print(y)
+    Weight <- read_csv(file.path("Max_Sharpe",paste0("weights_", y,".csv")))
+    # Normalizing weights (as weights of 10^-5 and lower have been set to 0)
+    Weight <- Weight %>% rename("Id" = Row) %>% 
+      mutate(Id = as.character(Id),
+             x_vect = x_vect/sum(x_vect)) %>% 
+      arrange(-x_vect)
+    
+    if (j == 0) {
+      Weights_df <- Weight
+      names(Weights_df)[names(Weights_df) == "x_vect"] <- y
+    } else {
+      Weights_df <- full_join(Weights_df, Weight, by="Id")
+      names(Weights_df)[names(Weights_df) == "x_vect"] <- y
+    }
+    
+    j = j+1 
+  }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+# Portfolio Figures calculation
+Weights_df[is.na(Weights_df)] <- 0
+
+# Yearly turnover (as per Hanauer, Lauterbach (2019))
+T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
+transposed_Weights <- as.data.frame(t(Weights_df))
+names(transposed_Weights) <- Weights_df$Id
+transposed_Weights <- transposed_Weights[-1,]
+to <- function(weight){
+  result <- abs(as.numeric(lead(weight)) - as.numeric(weight))
+}
+Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
+Turnover <- as.data.frame(sum(Turnover_df)/(2*T))
+colnames(Turnover)[1]<-"Turnover"
+Results_SR <- merge(Results_SR, Turnover)
+
+# Effective N (as per Hanauer, Lauterbach (2019))
+eN <- function(weight){
+  result <- (as.numeric(weight)^2)
+}
+Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
+inverse <- function(weight){
+  result <- 1/weight
+}
+Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N <- as.data.frame(Effective_N/T)
+colnames(Effective_N)[1]<-"Effective_N"
+Results_SR <- merge(Results_SR, Effective_N)
+
+
+#Max Drawdown
+MD <- as.data.frame(-min(Portfolio_Returns_SR$portfolio_ret)*100)
+colnames(MD)[1] <- "MD"
+Results_SR <- merge(Results_SR, MD)
+
+#Total Cummultated Return
+TCR <- as.data.frame(tail(Portfolio_Returns_SR$Portfolio_Value,n=1))
+colnames(TCR)[1]<-"Total Cum. Return"
+Results_SR <- merge(Results_SR, TCR)
+
+#Avg Number of Stocks
+avgStocks <- as.data.frame(mean(NumberOfStock$V2))
+colnames(avgStocks)[1]<-"avg. Number of stocks"
+Results_SR <- merge(Results_SR, avgStocks)
+
+#Information Ratio
+source("MSCI.R")
+MP <- MSCI_weighted
+colnames(MP)[2]<-"YMR"
+IR<-Portfolio_Returns_SR
+IR<-merge(IR, MP, by.x=c("y"), by.y=c("year"))
+IR <- left_join(IR, Std_Deviation, by="y") %>% mutate(YMR = YMR - 1)
+IR <- IR %>% mutate(InfRatio= (portfolio_ret-YMR)/Std)
+InfRatio <- as.data.frame(mean(IR$InfRatio))
+colnames(InfRatio)[1]<-"Information Ratio"
+Results_SR <- merge(Results_SR, InfRatio)
+
+#Tracking Error
+retPeriods <- 2018-1995+1-1
+IR$help <-IR$portfolio_ret-IR$YMR
+TE <- as.data.frame(sqrt(sum((IR$help)^2)/retPeriods)*100)
+colnames(TE)[1]<-"TrackingError"
+Results_SR <- merge(Results_SR, TE)
+
+
+
+
+
+
+
+rownames(Results_SR)[1]<-"Min_Variance-Portfolio"
+
+# rm(y,Weight,top10,stocks_ret,stocks_temp,Std_Dev,
+# Std_Deviation,SR,SharpeRatio,Portfolio_monthly_RET,Portfolio_Returns, 
+# portfolio, 
+# meanWeights,FF,Volatility, Concentration,stocks)
