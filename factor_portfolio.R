@@ -9,7 +9,7 @@ source("Factors.R")
 factor_port <- factors
 # Removes all the Inf observations
 factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
-factor_port <- factor_port %>% filter(pf.size == "Big") %>% 
+factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Jun 1998") %>% 
   select(Id, country, LMV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
   filter(across(everything(), ~ !is.na(.x)))
 #test <- test %>% mutate(fac_score = 0.5*BM_m + 0.5*GPA) %>% group_by(ym) %>%
@@ -23,7 +23,7 @@ N <- length(fac)
 # Not sure if minus beta and minus NOA is correct
 factor_port <- factor_port %>% mutate(fac_score = 1/N*-Beta + 1/N*BM_m + 1/N*GPA + 1/N*-NOA + 1/N*Momentum) %>% 
   group_by(ym) %>% arrange(ym, desc(fac_score)) %>% 
-  filter(ym > "Jun 1995" & !is.nan(fac_score))
+  filter(ym > "Jun 1998" & !is.nan(fac_score))
 
 counts <- factor_port %>% summarise(n_obs = n())
 
@@ -46,7 +46,7 @@ factor_port <- factor_port[ , bucket := ifelse(fac_score>top80, 1,
                                              ifelse(fac_score<=top20,5,NA)))))]
 
 
-inv_universe <- factor_port %>% filter(bucket == 1) %>% group_by(ym) %>% arrange(ym, desc(fac_score)) %>% select(-n_obs)
+inv_universe <- factor_port %>% filter(bucket == 1 | bucket == 2) %>% group_by(ym) %>% arrange(ym, desc(fac_score)) %>% select(-n_obs)
 univ_count <- inv_universe %>% summarise(n_obs = n())
 inv_universe <- merge(inv_universe, univ_count)
 
