@@ -15,7 +15,7 @@ N <- length(fac)
 # Not sure if minus beta and minus NOA is correct
 factor_port <- factor_port %>% mutate(fac_score = 1/N*-Beta + 1/N*BM_m + 1/N*GPA + 1/N*-NOA + 1/N*Momentum) %>% 
   group_by(ym) %>% arrange(ym, desc(fac_score)) %>% 
-  filter(ym > "Dec 1999" & !is.nan(fac_score))
+  filter(ym > "Jun 1995" & !is.nan(fac_score))
 
 counts <- factor_port %>% summarise(n_obs = n())
 
@@ -42,7 +42,7 @@ inv_universe <- factor_port %>% filter(bucket == 1) %>% group_by(ym) %>% arrange
 univ_count <- inv_universe %>% summarise(n_obs = n())
 inv_universe <- merge(inv_universe, univ_count)
 
-
+rm(factor_port, quint, counts)
 
 # Only invest in the first bucket and do equal weighting
 eq_port <- inv_universe %>% group_by(ym) %>%  mutate(weights = 1 / n_obs)
@@ -78,11 +78,25 @@ inverse <- function(weight){
 Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
 Effective_N <- Effective_N/T
 
+# Sharpe Ratio
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
+         Year = year(ym))
+FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF))
+Eq_factor_portfolio <- Eq_factor_portfolio %>% mutate(Year = year(ym))
+sd_dev <- sd(Eq_factor_portfolio$monthly_ret)*sqrt(12)
+Yearly_ret <- Eq_factor_portfolio %>% group_by(Year) %>% summarise(Yret = prod(ret))
+Yearly_ret <- merge(Yearly_ret, FF, by = "Year")
+SR <- Yearly_ret
+SR <- SR %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
+SR <- SR %>% mutate(sharpe_ratio = (ret-rf)/sd)
+
 # Maximum Drawdown
 
 MD <- -min(Eq_factor_portfolio$ret)
 
-# This wasnt so good now try MV Weighted
+# Now try the MV
 total_mv_yearly <- inv_universe %>% group_by(ym) %>% 
   summarise(mv_total = sum(LMV.USD))
 vw_port <- merge(inv_universe, total_mv_yearly, by = "ym")
@@ -125,14 +139,28 @@ inverse <- function(weight){
 Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
 Effective_N <- Effective_N/T
 
+# Sharpe Ratio
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
+         Year = year(ym))
+FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF))
+VW_Factor_Portfolio <- VW_Factor_Portfolio %>% mutate(Year = year(ym))
+sd_dev <- sd(VW_Factor_Portfolio$monthly_ret)*sqrt(12)
+Yearly_ret <- VW_Factor_Portfolio %>% group_by(Year) %>% summarise(Yret = prod(ret))
+Yearly_ret <- merge(Yearly_ret, FF, by = "Year")
+SR_vw <- Yearly_ret
+SR_vw <- SR_vw %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
+SR_vw <- SR_vw %>% mutate(sharpe_ratio = (ret-rf)/sd)
+
 top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
 top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
 mean(top10$avg_weight)
 
+
 # Maximum Drawdown
 
 MD <- -min(VW_Factor_Portfolio$ret)
-
 
 
 # Lets try fac_score weighted
@@ -149,6 +177,115 @@ cum_return_fs <- fac_weighted %>% group_by(ym) %>% summarise(monthly_ret = sum(w
 Fac_weighted_Portfolio <- cum_return_fs %>% arrange(ym) %>%
   mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Fac_weighted_Portfolio$Portfolio_Value[1] <- 100
+
+# Yearly turnover (as per Hanauer, Lauterbach (2019))
+Weights_df <- fac_weighted %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
+Weights_df <- Weights_df %>% replace(is.na(.),0)
+T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
+transposed_Weights <- as.data.frame(t(Weights_df))
+names(transposed_Weights) <- Weights_df$Id
+transposed_Weights <- transposed_Weights[-1,]
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.factor), as.character))
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.character), as.numeric))
+to <- function(weight){
+  result <- abs(lead(weight) - weight)
+}
+Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
+Turnover <- sum(Turnover_df)/(2*T)
+
+# Effective N (as per Hanauer, Lauterbach (2019))
+eN <- function(weight){
+  result <- ((weight)^2)
+}
+Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
+inverse <- function(weight){
+  result <- 1/weight
+}
+Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N <- Effective_N/T
+
+# Sharpe Ratio
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
+         Year = year(ym))
+FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF))
+Fac_weighted_Portfolio <- Fac_weighted_Portfolio %>% mutate(Year = year(ym))
+sd_dev <- sd(Fac_weighted_Portfolio$monthly_ret)*sqrt(12)
+Yearly_ret <- Fac_weighted_Portfolio %>% group_by(Year) %>% summarise(Yret = prod(ret))
+Yearly_ret <- merge(Yearly_ret, FF, by = "Year")
+SR_fw <- Yearly_ret
+SR_fw <- SR_fw %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
+SR_fw <- SR_fw %>% mutate(sharpe_ratio = (ret-rf)/sd)
+
+top10 <- fac_weighted %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
+top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
+mean(top10$avg_weight)
+
+# Now try the MV but limit maximum weights to 10%
+total_mv_yearly <- inv_universe %>% group_by(ym) %>% 
+  summarise(mv_total = sum(LMV.USD))
+vw_port <- merge(inv_universe, total_mv_yearly, by = "ym")
+# Weights are calculated by MV
+test <- vw_port %>% select(RET, LMV.)
+test <- portfolio.optim(vw_port$RET, reshigh = 0.10)
+vw_port <- vw_port %>% group_by(ym)  %>%  
+  mutate(weights = LMV.USD / mv_total,
+         weights = ifelse(weights < 0.0001, 0, weights),
+         weights = ifelse(weights > 0.10, 0.10, weights),
+         
+         cum_weights = cumsum(weights),
+         weighted_return = weights * RET.USD)
+
+cum_return_vw <- vw_port %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_return)) %>% drop_na()
+VW_Factor_Portfolio <- cum_return_vw %>% arrange(ym) %>%
+  mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+VW_Factor_Portfolio$Portfolio_Value[1] <- 100
+
+# Yearly turnover (as per Hanauer, Lauterbach (2019))
+Weights_df <- vw_port %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
+Weights_df <- Weights_df %>% replace(is.na(.),0)
+T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
+transposed_Weights <- as.data.frame(t(Weights_df))
+names(transposed_Weights) <- Weights_df$Id
+transposed_Weights <- transposed_Weights[-1,]
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.factor), as.character))
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.character), as.numeric))
+to <- function(weight){
+  result <- abs(lead(weight) - weight)
+}
+Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
+Turnover <- sum(Turnover_df)/(2*T)
+
+# Effective N (as per Hanauer, Lauterbach (2019))
+eN <- function(weight){
+  result <- ((weight)^2)
+}
+Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
+inverse <- function(weight){
+  result <- 1/weight
+}
+Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N <- Effective_N/T
+
+# Sharpe Ratio
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
+         Year = year(ym))
+FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF))
+VW_Factor_Portfolio <- VW_Factor_Portfolio %>% mutate(Year = year(ym))
+sd_dev <- sd(VW_Factor_Portfolio$monthly_ret)*sqrt(12)
+Yearly_ret <- VW_Factor_Portfolio %>% group_by(Year) %>% summarise(Yret = prod(ret))
+Yearly_ret <- merge(Yearly_ret, FF, by = "Year")
+SR_vw <- Yearly_ret
+SR_vw <- SR_vw %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
+SR_vw <- SR_vw %>% mutate(sharpe_ratio = (ret-rf)/sd)
+
+top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
+top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
+mean(top10$avg_weight)
+
 
 # Next try z-transformation of the factors
 factor_port <- factors
