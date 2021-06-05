@@ -319,9 +319,19 @@ SR_vw <- Yearly_ret
 SR_vw <- SR_vw %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
 SR_vw <- SR_vw %>% mutate(sharpe_ratio = (ret-rf)/sd)
 
+# Hit Rate
+hit_rate <- vw_port %>% filter(weights > 0) %>% mutate(hit = ifelse(RET>0, 1, 0))
+hit_rate <- hit_rate %>% ungroup %>% summarise(hit_rate = sum(hit) / n())
+
+# Average Number of Stocks
+number_stocks <- vw_port %>% filter(weights > 0) %>% summarise(n_stocks = n())
+mean(number_stocks$n_stocks)
+
 top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
 top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
 mean(top10$avg_weight)
+
+MD <- -min(VW_Factor_Portfolio$ret)
 
 
 # Next try z-transformation of the factors
@@ -408,8 +418,10 @@ top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 
 top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
 mean(top10$avg_weight)
 
-
-
+IR <- merge(VW_Factor_Portfolio, Portfolio_Returns, by = "ym")
+sd_dev <- sd(IR$monthly_ret.x)*sqrt(12)
+IR <- IR %>% summarise(sd = sd_dev, ret = (mean(ret.x)-1)*100, bench = (mean(ret.y)-1)*100)
+IR <- IR %>% mutate(information_ratio = ((ret-bench)/sd))
 # total_mv_yearly <- test_port %>% group_by(ym) %>% 
 #   summarise(mv_total = sum(MV.USD))
 # test_port <- merge(test_port, total_mv_yearly, by = "ym")
