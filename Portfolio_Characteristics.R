@@ -29,9 +29,10 @@ ggplot(data = n_sectors, aes(x = INDM, y = n_obs)) +
   geom_bar(stat="identity")
 
 n_sectors_weighted <- all_data
+n_sectors_weighted <- merge(all_data, FAT.static, by = "Id")
 #n_sectors_weighted <- merge(all_data, FAT.static, by = c("Id", "country"))
-n_sectors_weighted <- n_sectors_weighted %>% mutate(MV.Total = sum(MV.USD, na.rm = T)) %>% select(Id, INDM, MV.Total,
-                                                                                       MV.USD)
+n_sectors_weighted <- n_sectors_weighted %>%  select(Id, INDM, MV.USD) %>% 
+  mutate(MV.Total = sum(MV.USD, na.rm = T))
 n_sectors_weighted <- n_sectors_weighted %>% mutate(weights = MV.USD/MV.Total) %>% drop_na()
 n_sectors_weighted <- n_sectors_weighted %>% group_by(INDM) %>% summarise(weighted_obs = sum(weights))
 sum(n_sectors_weighted$weighted_obs)
