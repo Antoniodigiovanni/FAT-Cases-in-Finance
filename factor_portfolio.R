@@ -366,7 +366,7 @@ Portfolio_Returns$Portfolio_Value[1] <- 100
 
 # Yearly turnover (as per Hanauer, Lauterbach (2019))
 Weights_df <- mpf %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
-Weights_df <- mpf %>% replace(is.na(.),0)
+Weights_df <- Weights_df %>% replace(is.na(.),0)
 T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
 transposed_Weights <- as.data.frame(t(Weights_df))
 names(transposed_Weights) <- Weights_df$Id
