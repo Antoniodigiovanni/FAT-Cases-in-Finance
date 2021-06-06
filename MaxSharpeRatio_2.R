@@ -30,9 +30,10 @@ stocks <- left_join(stocks,
 
 
 # Still not ordering by Market Cap (less than 1000 big stocks (with complete obs) each year, maybe we use all of them?)
-RET$year <- year(RET$ym)
-Years_list <- unique(RET$year)
+Ret$year <- year(Ret$ym)
+Years_list <- unique(Ret$year)
 write.csv(Years_list, file = file.path("Max_Sharpe","Years_list.csv"))
+#View(Years_list)
 
 for (y in Years_list){
   print(y)
@@ -94,7 +95,6 @@ Hit <-as.data.frame(matrix(nrow = length(Years_list)-1,
                                      ncol = 3))
 
 for (y in Years_list){
-  
   # Loading Portfolio Weights
   tryCatch({
     # Create one df for each year with the following line
@@ -110,7 +110,7 @@ for (y in Years_list){
     names(Weight)[names(Weight)=="Row"] <- c("Id")
     Weight <- Weight%>% mutate(Id = as.character(Id), 
                                                  x_vect = x_vect/sum(x_vect)) %>% 
-                                                   arrange(-x_vect)
+                                                   arrange(-x_vect)%>%filter(x_vect>0)
     
     
     #for portfolio concentration,Top 10
@@ -138,8 +138,7 @@ for (y in Years_list){
     
     #Calculate Input for Hit Rate
     Hit[y-1997,1]<-y
-    hlp <- Weight %>% filter(x_vect>0)
-    Hit[y-1997,2]<-nrow(hlp)
+    Hit[y-1997,2]<-nrow(Weight)
     rm(hlp)
     
     hlp<-stocks_ret %>% filter(Ret>0)
