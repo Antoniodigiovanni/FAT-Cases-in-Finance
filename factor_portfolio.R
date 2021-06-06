@@ -10,7 +10,7 @@ factor_port <- factors
 # Removes all the Inf observations
 factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
 factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Jun 1998") %>% 
-  select(Id, country, LMV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
+  select(Id,Date, country, LMV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
   filter(across(everything(), ~ !is.na(.x)))
 #test <- test %>% mutate(fac_score = 0.5*BM_m + 0.5*GPA) %>% group_by(ym) %>%
   #summarise(n_obs = n()) %>% arrange(fac_score) %>% drop_na()
@@ -332,7 +332,7 @@ top10 <- top10 %>% summarise(avg_weight = mean(weights))
 mean(top10$avg_weight)
 
 MD <- -min(VW_Factor_Portfolio$ret)
-
+write.csv(VW_Factor_Portfolio, "vw_portfolio_limit.csv")
 
 # Next try z-transformation of the factors
 factor_port <- factors
@@ -355,7 +355,7 @@ factor_port <- factor_port %>% mutate(mean_beta = mean(Beta),
 factor_port <- factors
 # Removes all the Inf observations
 factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
-factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Jun 1995") %>% 
+factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Jun 1998") %>% 
   select(Id, country, LMV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
   filter(across(everything(), ~ !is.na(.x))) %>% arrange(ym)
 
@@ -373,6 +373,87 @@ cum_return_mpf <- mpf %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_
 Portfolio_Returns <- cum_return_mpf %>% arrange(ym) %>%
   mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Portfolio_Returns$Portfolio_Value[1] <- 100
+
+write.csv(Portfolio_Returns, "vw_market.csv")
+write.csv(Eq_factor_portfolio, "eq_port.csv")
+
+# Yearly turnover (as per Hanauer, Lauterbach (2019))
+Weights_df <- mpf %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
+Weights_df <- Weights_df %>% replace(is.na(.),0)
+T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
+transposed_Weights <- as.data.frame(t(Weights_df))
+names(transposed_Weights) <- Weights_df$Id
+transposed_Weights <- transposed_Weights[-1,]
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.factor), as.character))
+transposed_Weights <- transposed_Weights %>% mutate(across(where(is.character), as.numeric))
+to <- function(weight){
+  result <- abs(lead(weight) - weight)
+}
+Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
+Turnover <- sum(Turnover_df)/(2*T)
+
+# Effective N (as per Hanauer, Lauterbach (2019))
+eN <- function(weight){
+  result <- ((weight)^2)
+}
+Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
+inverse <- function(weight){
+  result <- 1/weight
+}
+Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N <- Effective_N/T
+
+# Sharpe Ratio
+FF <- read_csv("FF Monthly.CSV") %>% 
+  rename(ym = X1) %>%  
+  mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
+         Year = year(ym))
+FF <- FF %>% group_by(Year) %>% mutate(RF=(RF/100+1)) %>% summarise(YRF=prod(RF))
+Portfolio_Returns <- Portfolio_Returns %>% mutate(Year = year(ym))
+sd_dev <- sd(Portfolio_Returns$monthly_ret)*sqrt(12)
+Yearly_ret <- Portfolio_Returns %>% group_by(Year) %>% summarise(Yret = prod(ret))
+Yearly_ret <- merge(Yearly_ret, FF, by = "Year")
+SR_market <- Yearly_ret
+SR_market <- SR_market %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
+SR_market <- SR_market %>% mutate(sharpe_ratio = (ret-rf)/sd)
+
+top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
+top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
+mean(top10$avg_weight)
+
+IR <- merge(VW_Factor_Portfolio, Portfolio_Returns, by = "ym")
+sd_dev <- sd(IR$monthly_ret.x)*sqrt(12)
+IR <- IR %>% summarise(sd = sd_dev, ret = (mean(ret.x)-1)*100, bench = (mean(ret.y)-1)*100)
+IR <- IR %>% mutate(information_ratio = ((ret-bench)/sd))
+
+
+# Check EW return of all stocks
+factor_port <- factors
+# Removes all the Inf observations
+factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
+factor_port <- factor_port %>% filter(pf.size == "Big" & ym > "Jun 1998") %>% 
+  select(Id, country, LMV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
+  filter(across(everything(), ~ !is.na(.x))) %>% arrange(ym)
+
+n_obs <- factor_port %>% group_by(ym) %>% summarise(n_obs = n())
+
+ew_mpf <- merge(factor_port, n_obs, by = "ym")
+ew_mpf <- ew_mpf %>% group_by(ym)  %>%  
+  mutate(weights = 1 / n_obs,
+         cum_weights = cumsum(weights),
+         weighted_return = weights * RET.USD)
+
+cum_return_ew_mpf <- ew_mpf %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_return)) %>% drop_na()
+
+
+Portfolio_Returns_EW <- cum_return_ew_mpf %>% arrange(ym) %>%
+  mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+Portfolio_Returns_EW$Portfolio_Value[1] <- 100
+
+write.csv(Portfolio_Returns_EW, "ew_market.csv")
+
+write.csv(Portfolio_Returns, "vw_market.csv")
+write.csv(Eq_factor_portfolio, "eq_port.csv")
 
 # Yearly turnover (as per Hanauer, Lauterbach (2019))
 Weights_df <- mpf %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)

@@ -4,6 +4,7 @@ value_port <- vw_port %>% filter(weights > 0) %>% select(ym, Id, country, LMV.US
                                                          pf.size, weights)
 
 
+load(file.path("Data","FAT_monthly.RData"))
 load(file.path("Data","FAT_static.RData"))
 
 # Check country distribution of value weighted portfolio
@@ -11,7 +12,7 @@ n_country <- value_port %>% group_by(country) %>% summarise(sum_weights = sum(we
 value_port
 
 # Compare this to overall sample
-n_country_full_sample <- all_data %>% group_by(country) %>% summarise(n_obs = n())
+n_country_full_sample <- FAT.monthly %>% group_by(country) %>% summarise(n_obs = n())
 
 ggplot(data = n_country,aes(x = country, y = n_obs)) +
   geom_bar(stat="identity")
@@ -28,7 +29,7 @@ n_sectors <- value_port %>% group_by(INDM) %>% summarise(sum_weights = sum(weigh
 ggplot(data = n_sectors, aes(x = INDM, y = n_obs)) + 
   geom_bar(stat="identity")
 
-n_sectors_weighted <- all_data
+n_sectors_weighted <- FAT.monthly
 n_sectors_weighted <- merge(all_data, FAT.static, by = "Id")
 #n_sectors_weighted <- merge(all_data, FAT.static, by = c("Id", "country"))
 n_sectors_weighted <- n_sectors_weighted %>%  select(Id, INDM, MV.USD) %>% 
