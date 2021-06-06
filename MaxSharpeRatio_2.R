@@ -6,6 +6,7 @@
 ################################################################################
 
 library(rstudioapi)
+library(tidyverse)
 #library(rapportools)
 
 # Set the working directory to the script directory
@@ -15,7 +16,7 @@ source("Real_data_prep.R")
 FF <- read_csv("FF Monthly.CSV") %>% 
   rename(ym = X1) %>%  
   mutate(ym = as.yearmon(as.character(ym), "%Y%m"))
-#source("ReturnForecast.R")
+source("ReturnForecast.R")
 
 # Reconstruction date -> July of each year
 # matrix based on the excess returns of the previous 36 months excess returns
@@ -29,8 +30,8 @@ stocks <- left_join(stocks,
 
 
 # Still not ordering by Market Cap (less than 1000 big stocks (with complete obs) each year, maybe we use all of them?)
-
-Years_list <- unique(stocks$year)
+RET$year <- year(RET$ym)
+Years_list <- unique(RET$year)
 write.csv(Years_list, file = file.path("Max_Sharpe","Years_list.csv"))
 
 for (y in Years_list){
@@ -63,13 +64,12 @@ for (y in Years_list){
   Cov_spread_transpose<- Cov_spread_transpose %>% filter(row.names(Cov_spread_transpose) %in% Ret_t$Id)
   Cov_spread_t <- as.data.frame(t(Cov_spread_transpose))
 
-  if (!is_empty(Cov_spread_t) & !is.empty(Ret_t)){
+  if (!is_empty(Cov_spread_t) & !is_empty(Ret_t)){
     cov_m <- cov(Cov_spread_t, use = "pairwise.complete.obs")
     cov_m <- as.data.frame(cov_m)
     write.csv(Ret_t, file = file.path("Max_Sharpe", paste0("Ret_",y,".csv")))
     write.csv(cov_m, file = file.path("Max_Sharpe",paste0("cov_",y,".csv")))
   }
-  
   
   
 }
@@ -90,6 +90,9 @@ meanWeights <- as.data.frame(matrix(nrow = length(Years_list)-1,
                                 ncol = 2))
 NumberOfStock <-as.data.frame(matrix(nrow = length(Years_list)-1,
                                      ncol = 2))
+Hit <-as.data.frame(matrix(nrow = length(Years_list)-1,
+                                     ncol = 3))
+
 for (y in Years_list){
   
   # Loading Portfolio Weights
@@ -113,14 +116,14 @@ for (y in Years_list){
     #for portfolio concentration,Top 10
     top10 <- Weight %>% arrange(desc(x_vect)) %>% slice_head(n = 10)
     
-    meanWeights[y-1994,1]<-y
-    meanWeights[y-1994,2]<- top10 %>% summarise(mean(x_vect))
+    meanWeights[y-1997,1]<-y
+    meanWeights[y-1997,2]<- top10 %>% summarise(mean(x_vect))
     
     #Number of stocks per year in Portfolio
    
-    NumberOfStock[y-1994,1]<-y
+    NumberOfStock[y-1997,1]<-y
     hlp <- Weight %>% filter(x_vect>0)
-    NumberOfStock[y-1994,2]<-nrow(hlp)
+    NumberOfStock[y-1997,2]<-nrow(hlp)
     rm(hlp)
     
     # Perform calculations on portfolios or create some df with all the Ids and the
@@ -133,6 +136,15 @@ for (y in Years_list){
       group_by(Id) %>% 
       summarise(Ret = prod(RET, na.rm = T)) %>% mutate(Ret = Ret-1)
     
+    #Calculate Input for Hit Rate
+    Hit[y-1997,1]<-y
+    hlp <- Weight %>% filter(x_vect>0)
+    Hit[y-1997,2]<-nrow(hlp)
+    rm(hlp)
+    
+    hlp<-stocks_ret %>% filter(Ret>0)
+    Hit[y-1997,3]<-nrow(hlp)
+    rm(hlp)
     # Calculate annualized mean monthly excess return, return and annualized standard dev.
     
     stocks_temp <- stocks_temp %>% mutate(Excess_RET = (RET-RF)/100)
@@ -297,7 +309,7 @@ Results_SR <- merge(Results_SR, avgStocks)
 
 #Information Ratio
 source("MSCI.R")
-MP <- MSCI_weighted
+MP <- MSCI_weighted %>% select(c("year", "ret"))
 colnames(MP)[2]<-"YMR"
 IR<-Portfolio_Returns_SR
 IR<-merge(IR, MP, by.x=c("y"), by.y=c("year"))
@@ -314,7 +326,13 @@ TE <- as.data.frame(sqrt(sum((IR$help)^2)/retPeriods)*100)
 colnames(TE)[1]<-"TrackingError"
 Results_SR <- merge(Results_SR, TE)
 
-                           
+#HitRate
+colnames(Hit)[2]<-"totalNumberOfStocks"
+colnames(Hit)[3]<-"posStocks"
+Hit<-Hit%>% mutate(HitRate = posStocks/totalNumberOfStocks)
+HR<-as.data.frame(mean(Hit$HitRate)*100)
+colnames(HR)[1]<-"HitRate"
+Results_SR <- merge(Results_SR, HR)                          
 
 
 
