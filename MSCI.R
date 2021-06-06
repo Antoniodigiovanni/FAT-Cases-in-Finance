@@ -18,10 +18,13 @@ annMW <- annMW %>% spread(country, countryWeight)
 annCountryWeights <- annMW
 #calculate the annual Return per country * weight
 annMW <- annMW[-c(1),]
+annMW<-subset(annMW, annMW$year >= 1998)
+
 MSCI_weighted <- annMW %>% mutate( TWN = TWN * MSCI_Country_Returns$TAI, HKG = HKG * MSCI_Country_Returns$HKG, KOR = KOR * MSCI_Country_Returns$KOR, SGP = SGP*MSCI_Country_Returns$SGP)
 MSCI_weighted <- MSCI_weighted %>% mutate(ret=TWN+KOR+HKG+SGP) %>%
   select(year,ret)
 MSCI_weighted$annRet<-MSCI_weighted$ret-1
+
 
 #Annualized Return
 AR<-as.data.frame(mean(MSCI_weighted$annRet)*100)
@@ -51,6 +54,8 @@ colnames(Volatility)[1]<-"Volatility"
 Results_MSCI <- merge(AR, Volatility)
 rownames(Results_MSCI)[1]<-"MSCI"
 
+MSCI_weighted <- MSCI_weighted %>% mutate(Portfolio_Value = 100*lag(cumprod(annRet+1)))
+MSCI_weighted$Portfolio_Value[1]=100
 rm(AR, Volatility)
 
 
