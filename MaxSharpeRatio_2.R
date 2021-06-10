@@ -6,7 +6,6 @@
 ################################################################################
 
 library(rstudioapi)
-library(tidyverse)
 #library(rapportools)
 
 # Set the working directory to the script directory
@@ -16,6 +15,7 @@ source("Real_data_prep.R")
 FF <- read_csv("FF Monthly.CSV") %>% 
   rename(ym = X1) %>%  
   mutate(ym = as.yearmon(as.character(ym), "%Y%m"))
+
 source("ReturnForecast.R")
 
 # Reconstruction date -> July of each year
@@ -30,6 +30,7 @@ stocks <- left_join(stocks,
 
 
 # Still not ordering by Market Cap (less than 1000 big stocks (with complete obs) each year, maybe we use all of them?)
+
 Ret$year <- year(Ret$ym)
 Years_list <- unique(Ret$year)
 write.csv(Years_list, file = file.path("Max_Sharpe","Years_list.csv"))
@@ -73,6 +74,7 @@ for (y in Years_list){
   }
   
   
+  
 }
 rm(y, cov_m, Cov_prep, Cov_spread,Exist_in_July,Investable_Ids)
 
@@ -91,9 +93,9 @@ meanWeights <- as.data.frame(matrix(nrow = length(Years_list)-1,
                                 ncol = 2))
 NumberOfStock <-as.data.frame(matrix(nrow = length(Years_list)-1,
                                      ncol = 2))
-Hit <-as.data.frame(matrix(nrow = length(Years_list)-1,
-                                     ncol = 3))
 
+Hit <-as.data.frame(matrix(nrow = length(Years_list)-1,
+                           ncol = 3))
 for (y in Years_list){
   # Loading Portfolio Weights
   tryCatch({
@@ -110,7 +112,7 @@ for (y in Years_list){
     names(Weight)[names(Weight)=="Row"] <- c("Id")
     Weight <- Weight%>% mutate(Id = as.character(Id), 
                                                  x_vect = x_vect/sum(x_vect)) %>% 
-                                                   arrange(-x_vect)%>%filter(x_vect>0)
+                                                   arrange(-x_vect)
     
     
     #for portfolio concentration,Top 10
@@ -136,14 +138,22 @@ for (y in Years_list){
       group_by(Id) %>% 
       summarise(Ret = prod(RET, na.rm = T)) %>% mutate(Ret = Ret-1)
     
+    hlp<-Weight%>%filter(x_vect>0)
+    temp_stocks_ret <- stocks_temp %>% filter(Id %in% hlp$Id) %>% mutate(RET = (RET/100+1)) %>% 
+      group_by(Id) %>% 
+      summarise(Ret = prod(RET, na.rm = T)) %>% mutate(Ret = Ret-1)
+    
+
     #Calculate Input for Hit Rate
     Hit[y-1997,1]<-y
-    Hit[y-1997,2]<-nrow(Weight)
-    rm(hlp)
+    hlp<-Weight%>%filter(x_vect>0)
+    Hit[y-1997,2]<-nrow(hlp)
+ 
     
-    hlp<-stocks_ret %>% filter(Ret>0)
-    Hit[y-1997,3]<-nrow(hlp)
-    rm(hlp)
+    temp_stocks_ret<-temp_stocks_ret %>% filter(Ret>0)
+    Hit[y-1997,3]<-nrow(temp_stocks_ret)
+    rm(hlp, temp_stocks_ret)
+
     # Calculate annualized mean monthly excess return, return and annualized standard dev.
     
     stocks_temp <- stocks_temp %>% mutate(Excess_RET = (RET-RF)/100)
@@ -195,9 +205,10 @@ names(SharpeRatio)[names(SharpeRatio)=="mean(SR$Sharpe_Ratio)"]<-c("SharpeRatio"
 Volatility <- as.data.frame(sd(SR$portfolio_ret))
 names(Volatility)[names(Volatility)=="sd(SR$portfolio_ret)"] <- c("Volatility")
 
-#Annualized Return
+#Average Return
 AR<-as.data.frame(mean(SR$portfolio_ret)*100)
-colnames(AR)[1]<-"Annualized Return"
+colnames(AR)[1]<-"Average Return"
+
 
 #Concentration
 Concentration <- as.data.frame(mean(meanWeights$V2))
@@ -331,7 +342,7 @@ colnames(Hit)[3]<-"posStocks"
 Hit<-Hit%>% mutate(HitRate = posStocks/totalNumberOfStocks)
 HR<-as.data.frame(mean(Hit$HitRate)*100)
 colnames(HR)[1]<-"HitRate"
-Results_SR <- merge(Results_SR, HR)                          
+Results_SR <- merge(Results_SR, HR)
 
 
 
