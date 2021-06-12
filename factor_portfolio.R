@@ -28,7 +28,7 @@ factor_port <- factor_port %>% mutate(Beta_norm = (max(Beta) - Beta)/(max(Beta)-
                                       GPA_norm = (max(GPA) - GPA)/(max(GPA)-min(GPA)),
                                       NOA_norm = (max(NOA) - NOA)/(max(NOA)-min(NOA)),
                                       mom_norm = (max(Momentum) - Momentum)/(max(Momentum)-min(Momentum)))
-factor_port <- factor_port %>% mutate(fac_score = 1/N*Beta_norm + 1/N*BM_m_norm + 1/N*GPA_norm + 1/N*NOA_norm + 1/N*mom_norm) %>% 
+factor_port <- factor_port %>% mutate(fac_score = 1/N*-Beta_norm + 1/N*BM_m_norm + 1/N*GPA_norm + 1/N*-NOA_norm + 1/N*mom_norm) %>% 
   group_by(ym) %>% arrange(ym, desc(fac_score)) %>% 
   filter(ym > "Jun 1998" & !is.nan(fac_score))
 
