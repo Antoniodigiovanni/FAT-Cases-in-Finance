@@ -1,6 +1,7 @@
-#library(PortfolioAnalytics)
+library(tseries)
 #require(DEoptim)
 library(rstudioapi)
+
 
 # Set the working directory to the script directory
 setwd (dirname(getActiveDocumentContext()$path)) 
@@ -21,7 +22,13 @@ N <- length(fac)
 
 # Equal weighting of the factors
 # Not sure if minus beta and minus NOA is correct
-factor_port <- factor_port %>% mutate(fac_score = 1/N*-Beta + 1/N*BM_m + 1/N*GPA + 1/N*-NOA + 1/N*Momentum) %>% 
+# First normalize
+factor_port <- factor_port %>% mutate(Beta_norm = (max(Beta) - Beta)/(max(Beta)-min(Beta)),
+                                      BM_m_norm = (max(BM_m) - BM_m)/(max(BM_m)-min(BM_m)),
+                                      GPA_norm = (max(GPA) - GPA)/(max(GPA)-min(GPA)),
+                                      NOA_norm = (max(NOA) - NOA)/(max(NOA)-min(NOA)),
+                                      mom_norm = (max(Momentum) - Momentum)/(max(Momentum)-min(Momentum)))
+factor_port <- factor_port %>% mutate(fac_score = 1/N*Beta_norm + 1/N*BM_m_norm + 1/N*GPA_norm + 1/N*NOA_norm + 1/N*mom_norm) %>% 
   group_by(ym) %>% arrange(ym, desc(fac_score)) %>% 
   filter(ym > "Jun 1998" & !is.nan(fac_score))
 
@@ -100,7 +107,26 @@ SR <- Yearly_ret
 SR <- SR %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
 SR <- SR %>% mutate(sharpe_ratio = (ret-rf)/sd)
 
+# Hit Rate
+hit_rate <- eq_port %>% filter(weights > 0) %>% mutate(hit = ifelse(RET>0, 1, 0))
+hit_rate <- hit_rate %>% ungroup %>% summarise(hit_rate = sum(hit) / n())
+
+# Average Number of Stocks
+number_stocks <- eq_port %>% filter(weights > 0) %>% summarise(n_stocks = n())
+mean(number_stocks$n_stocks)
+
+IR <- merge(Eq_factor_portfolio, Portfolio_Returns, by = "ym")
+sd_dev <- sd(IR$monthly_ret.x)*sqrt(12)
+IR <- IR %>% summarise(sd = sd_dev, ret = (mean(ret.x)-1)*100, bench = (mean(ret.y)-1)*100)
+IR <- IR %>% mutate(information_ratio = ((ret-bench)/sd))
+
 # Maximum Drawdown
+rets <- pull(Eq_factor_portfolio, Portfolio_Value)
+rets <- xts(Eq_factor_portfolio$Portfolio_Value, order.by = Eq_factor_portfolio$ym)
+MD <- maxdrawdown(rets)
+rets[MD$from]
+rets[MD$to]
+drawdown <- (554.9008 - 1180.962) / 1180.962
 
 MD <- -min(Eq_factor_portfolio$ret)
 
@@ -499,10 +525,13 @@ top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 
 top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
 mean(top10$avg_weight)
 
-IR <- merge(VW_Factor_Portfolio, Portfolio_Returns, by = "ym")
+IR <- merge(Eq_factor_portfolio, Portfolio_Returns, by = "ym")
 sd_dev <- sd(IR$monthly_ret.x)*sqrt(12)
 IR <- IR %>% summarise(sd = sd_dev, ret = (mean(ret.x)-1)*100, bench = (mean(ret.y)-1)*100)
 IR <- IR %>% mutate(information_ratio = ((ret-bench)/sd))
+
+
+
 # total_mv_yearly <- test_port %>% group_by(ym) %>% 
 #   summarise(mv_total = sum(MV.USD))
 # test_port <- merge(test_port, total_mv_yearly, by = "ym")

@@ -62,6 +62,8 @@ all_data <- merge(all_data,hlpvariable,
 micro_stocks <- all_data %>% filter(pf.size == "Micro")
 nrow(all_data %>% filter(pf.size == "Micro")) / nrow(all_data)
 
+length(unique(micro_stocks$Id))
+
 all_data <- all_data %>% filter(pf.size != "Micro")
 
 # Merge FAT.monthly with the yearly accounting data
@@ -103,6 +105,16 @@ all_data <- merge(all_data, lag_variables, by.x = c("Id", "hcjun"), by.y = c("Id
 
 # Beta calculation
 
+median(all_data$MV.USD, na.rm = T)
+mean(all_data$MV.USD, na.rm = T)
+# How many large companies
+quantile(all_data$MV.USD, probs=c(0.9,1), na.rm = T)
+
+large <- all_data %>% filter(ym == "Jan 2018")
+small_static <- FAT.static %>% select(Id, INDM, NAME)
+large <- merge(large, small_static, by = "Id")
+large <- large %>% mutate(MV.Total = sum(MV.USD, na.rm = T),
+                          Weights = MV.USD/MV.Total) %>% select(Id, MV.USD, Weights)
 
 # Delete all unnecessary dataframes
 # Clear memory
