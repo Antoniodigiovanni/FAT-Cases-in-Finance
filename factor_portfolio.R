@@ -23,11 +23,11 @@ N <- length(fac)
 # Equal weighting of the factors
 # Not sure if minus beta and minus NOA is correct
 # First standardize using z-scores
-factor_port <- factor_port %>% mutate(Beta_norm = (Beta - mean(Beta)/sd(Beta)),
-                                      BM_m_norm = (BM_m - mean(BM_m)/sd(BM_m)),
-                                      GPA_norm = (GPA - mean(GPA)/sd(GPA)),
-                                      NOA_norm = (NOA - mean(NOA)/sd(NOA)),
-                                      Mom_norm = (Momentum - mean(Momentum)/sd(Momentum)))
+factor_port <- factor_port %>% mutate(Beta_norm = (Beta - mean(Beta))/sd(Beta),
+                                      BM_m_norm = (BM_m - mean(BM_m))/sd(BM_m),
+                                      GPA_norm = (GPA - mean(GPA))/sd(GPA),
+                                      NOA_norm = (NOA - mean(NOA))/sd(NOA),
+                                      Mom_norm = (Momentum - mean(Momentum))/sd(Momentum))
 factor_port <- factor_port %>% mutate(fac_score = 1/N*-Beta_norm + 1/N*BM_m_norm + 1/N*GPA_norm + 1/N*-NOA_norm + 1/N*Mom_norm) %>% 
   group_by(ym) %>% arrange(ym, desc(fac_score)) %>% 
   filter(ym > "Jun 1998" & !is.nan(fac_score))
