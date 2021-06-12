@@ -89,6 +89,7 @@ rm(y, cov_m, Cov_prep, Cov_spread,Exist_in_July,Investable_Ids)
 # Afterwards load the csv files with the optimal weights.
 Portfolio_Returns <- data.table()
 Std_Deviation <- data.table()
+Monthly_Portfolio_Return_MSR<-data.table()
 meanWeights <- as.data.frame(matrix(nrow = length(Years_list)-1,
                                 ncol = 2))
 NumberOfStock <-as.data.frame(matrix(nrow = length(Years_list)-1,
@@ -175,6 +176,8 @@ for (y in Years_list){
     portfolio_ret <- sum(portfolio$Ret*portfolio$x_vect, na.rm=TRUE)
     portfolio_ret <- as.data.frame(cbind(y, portfolio_ret))
     Portfolio_Returns <- as.data.table(rbind(Portfolio_Returns, portfolio_ret))
+    Monthly_Portfolio_Return_MSR<-as.data.frame(rbind(Monthly_Portfolio_Return_MSR, Portfolio_monthly_RET))
+    
     
     Std_Dev <- as.data.frame(cbind(y, Std_Dev))
     Std_Deviation <- as.data.table(rbind(Std_Deviation, Std_Dev))
@@ -184,11 +187,12 @@ for (y in Years_list){
 }
 
 Portfolio_Returns_SR <- Portfolio_Returns %>% arrange(y) %>%
-  mutate(ret = 1+portfolio_ret) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
+  mutate(ret = portfolio_ret+1) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Portfolio_Returns_SR$Portfolio_Value[1] <- 100
 #write_csv(Portfolio_Returns,"Portfolio_Returns_SR.csv")
 
 ##Calculate the Sharpe Ratio using the mean of the yearly Sharpe Ratio, i.e. the mean of annual returns divided by the annual std.dev.
+###Wrong Approach
 FF <- read_csv("FF Monthly.CSV") %>% 
   rename(ym = X1) %>%  
   mutate(ym = as.yearmon(as.character(ym), "%Y%m"),
@@ -200,14 +204,29 @@ SR <- left_join(SR, Std_Deviation, by="y") %>% mutate(YRF = YRF - 1)
 SR <- SR %>% mutate(Sharpe_Ratio = (portfolio_ret-YRF)/Std)
 SharpeRatio <- as.data.frame(mean(SR$Sharpe_Ratio))
 names(SharpeRatio)[names(SharpeRatio)=="mean(SR$Sharpe_Ratio)"]<-c("SharpeRatio")
+SR<-SR%>%mutate(RF_Value = 100*lag(cumprod((1+YRF))))
 
 ##Volatility
 Volatility <- as.data.frame(sd(SR$portfolio_ret))
-names(Volatility)[names(Volatility)=="sd(SR$portfolio_ret)"] <- c("Volatility")
+colnames(Volatility)[1] <- c("Volatility")
 
 #Average Return
 AR<-as.data.frame(mean(SR$portfolio_ret)*100)
 colnames(AR)[1]<-"Average Return"
+
+#Annualized Return
+AnR<-as.data.frame((tail(SR$Portfolio_Value, n=1)/100)^(1/(2018-1998+1))-1)
+colnames(AnR)[1]<-"Annualized Return"
+
+#Annualized Riskfree
+AnRF <-as.data.frame((tail(SR$RF_Value, n=1)/100)^(1/(2018-1998+1))-1)
+colnames(AnRF)[1]<-"Annualized RiskFreeReturn"
+
+
+
+SharpeRatio <- as.data.frame((AnR[1]-AnRF[1])/Volatility[1])
+colnames(SharpeRatio)[1]<-"SharpeRatio"
+
 
 
 #Concentration
@@ -241,6 +260,9 @@ names(Concentration)[names(Concentration)=="mean(meanWeights$V2)"] <- c("Concent
 Results_SR <- merge(Volatility, Concentration)
 Results_SR <- merge(Results_SR, SharpeRatio)
 Results_SR <- merge(Results_SR, AR)
+Results_SR <- merge(Results_SR, Volatility)
+Results_SR <- merge(Results_SR, AnR)
+Results_SR <- merge(Results_SR, AnRF)
 
 
 ###Creating the Weight df
@@ -346,7 +368,24 @@ Results_SR <- merge(Results_SR, HR)
 
 
 
+Monthly_Portfolio_Return_MSR<-Monthly_Portfolio_Return_MSR[order(Monthly_Portfolio_Return_MSR$ym),]
+write.csv(Monthly_Portfolio_Return_MSR,"Monthly_Portfolio_Return_MSR")
+
+
+Std <-sd(Monthly_Portfolio_Return_MSR$Port_RET)
+
+Monthly_Portfolio_Return_MSR<-Monthly_Portfolio_Return_MSR%>% mutate(year=year(ym))
+Monthly_Portfolio_Return_MSR<-Monthly_Portfolio_Return_MSR
+
+
+
+
+
+
+
+
+
 
 
 rownames(Results_SR)[1]<-"SRM-Portfolio"
-#rm(y,Weight,top10,stocks_ret,stocks_temp,Std_Dev,Std_Deviation,SR,SharpeRatio,Portfolio_monthly_RET,Portfolio_Returns, portfolio, meanWeights,FF,Volatility, Concentration,stocks)
+#rm(y,Weight,top10,stocks_ret,stocks_temp,Std_Dev,Std_Deviation,SR,SharpeRatio,Portfolio_monthly_RET,Portfolio_Returns, portfolio, meanWeights,FF,Volatility, Concentration,stocks) 
