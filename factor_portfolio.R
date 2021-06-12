@@ -22,13 +22,13 @@ N <- length(fac)
 
 # Equal weighting of the factors
 # Not sure if minus beta and minus NOA is correct
-# First normalize
-factor_port <- factor_port %>% mutate(Beta_norm = (max(Beta) - Beta)/(max(Beta)-min(Beta)),
-                                      BM_m_norm = (max(BM_m) - BM_m)/(max(BM_m)-min(BM_m)),
-                                      GPA_norm = (max(GPA) - GPA)/(max(GPA)-min(GPA)),
-                                      NOA_norm = (max(NOA) - NOA)/(max(NOA)-min(NOA)),
-                                      mom_norm = (max(Momentum) - Momentum)/(max(Momentum)-min(Momentum)))
-factor_port <- factor_port %>% mutate(fac_score = 1/N*-Beta_norm + 1/N*BM_m_norm + 1/N*GPA_norm + 1/N*-NOA_norm + 1/N*mom_norm) %>% 
+# First standardize using z-scores
+factor_port <- factor_port %>% mutate(Beta_norm = (Beta - mean(Beta)/sd(Beta)),
+                                      BM_m_norm = (BM_m - mean(BM_m)/sd(BM_m)),
+                                      GPA_norm = (GPA - mean(GPA)/sd(GPA)),
+                                      NOA_norm = (NOA - mean(NOA)/sd(NOA)),
+                                      Mom_norm = (Momentum - mean(Momentum)/sd(Momentum)))
+factor_port <- factor_port %>% mutate(fac_score = 1/N*-Beta_norm + 1/N*BM_m_norm + 1/N*GPA_norm + 1/N*-NOA_norm + 1/N*Mom_norm) %>% 
   group_by(ym) %>% arrange(ym, desc(fac_score)) %>% 
   filter(ym > "Jun 1998" & !is.nan(fac_score))
 
@@ -359,21 +359,6 @@ mean(top10$avg_weight)
 
 MD <- -min(VW_Factor_Portfolio$ret)
 write.csv(VW_Factor_Portfolio, "vw_portfolio_limit.csv")
-
-# Next try z-transformation of the factors
-factor_port <- factors
-# Removes all the Inf observations
-factor_port <- factor_port %>% filter(across(everything(), ~ !is.infinite(.x)))
-factor_port <- factor_port %>% filter(pf.size == "Big") %>% 
-  select(Id, country, MV.USD, RET.USD, RET, ym, Beta, BM_m, GPA, NOA, Momentum, pf.size) %>% 
-  filter(across(everything(), ~ !is.na(.x)))
-
-factor_port <- factor_port %>% mutate(mean_beta = mean(Beta),
-                                      mean_bm = mean(BM_m),
-                                      mean_gpa = mean(GPA),
-                                      mean_noa = mean(NOA),
-                                      mean_mom = mean(Momentum),
-                                      )
 
 
 
