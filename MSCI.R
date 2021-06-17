@@ -60,4 +60,10 @@ rm(AR, Volatility)
 
 
 
+MSCI_Country_Returns_m  <- read_excel("MSCI_monthly.xlsx")
+MSCI_Country_Returns_m <- MSCI_Country_Returns_m %>% mutate(year=year(Date))
+MSCI_Country_Returns_m<-subset(MSCI_Country_Returns_m, MSCI_Country_Returns_m$year >= 1998)
+MSCI_Country_Returns_m <- merge(MSCI_Country_Returns_m, annCountryWeights, by=c("year"))
+MSCI_Country_Returns_m <- MSCI_Country_Returns_m %>% mutate(MarketReturn = HKG * HKG_w+SGP*SGP_w+KOR*KOR_w+TAI*TWN_w)
+write.csv(MSCI_Country_Returns_m, "MSCI_weighted_monthly")
 

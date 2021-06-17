@@ -341,22 +341,22 @@ Results_SR <- merge(Results_SR, avgStocks)
 
 #Information Ratio
 source("MSCI.R")
-MP <- MSCI_weighted %>% select(c("year", "ret"))
-colnames(MP)[2]<-"YMR"
-IR<-Portfolio_Returns_SR
-IR<-merge(IR, MP, by.x=c("y"), by.y=c("year"))
-IR <- left_join(IR, Std_Deviation, by="y") %>% mutate(YMR = YMR - 1)
-IR <- IR %>% mutate(InfRatio= (portfolio_ret-YMR)/Std)
-InfRatio <- as.data.frame(mean(IR$InfRatio))
-colnames(InfRatio)[1]<-"Information Ratio"
-Results_SR <- merge(Results_SR, InfRatio)
+MSCI_annRet <- (tail(MSCI_weighted$Portfolio_Value, n=1)/100)^(1/(2018-1998+1))-1
 
-#Tracking Error
+IR<-merge(Portfolio_Returns, MSCI_weighted[,c("year", "annRet")], by.x="y", by.y="year")
+IR$SqDif <-(IR$portfolio_ret-IR$annRet)^2
+##Tracking Error
 retPeriods <- 2018-1995+1-1
-IR$help <-IR$portfolio_ret-IR$YMR
-TE <- as.data.frame(sqrt(sum((IR$help)^2)/retPeriods)*100)
+
+#IR$help <-IR$portfolio_ret-InfRatio$YMR
+TE <- as.data.frame(sqrt(sum(IR$SqDif))/retPeriods*100)
 colnames(TE)[1]<-"TrackingError"
 Results_SR <- merge(Results_SR, TE)
+
+
+InfRatio <- as.data.frame((AnR[1]-MSCI_annRet)/Results_SR$TrackingError[1])
+colnames(InfRatio)[1]<-"Information Ratio"
+Results_SR <- merge(Results_SR, InfRatio)
 
 #HitRate
 colnames(Hit)[2]<-"totalNumberOfStocks"
@@ -369,23 +369,13 @@ Results_SR <- merge(Results_SR, HR)
 
 
 Monthly_Portfolio_Return_MSR<-Monthly_Portfolio_Return_MSR[order(Monthly_Portfolio_Return_MSR$ym),]
-write.csv(Monthly_Portfolio_Return_MSR,"Monthly_Portfolio_Return_MSR")
+#write.csv(Monthly_Portfolio_Return_MSR,"Monthly_Portfolio_Return_MSR")
 
 
 Std <-sd(Monthly_Portfolio_Return_MSR$Port_RET)
 
 Monthly_Portfolio_Return_MSR<-Monthly_Portfolio_Return_MSR%>% mutate(year=year(ym))
 Monthly_Portfolio_Return_MSR<-Monthly_Portfolio_Return_MSR
-
-
-
-
-
-
-
-
-
-
 
 rownames(Results_SR)[1]<-"SRM-Portfolio"
 #rm(y,Weight,top10,stocks_ret,stocks_temp,Std_Dev,Std_Deviation,SR,SharpeRatio,Portfolio_monthly_RET,Portfolio_Returns, portfolio, meanWeights,FF,Volatility, Concentration,stocks) 
