@@ -23,6 +23,7 @@ Ops = sdpsettings ('solver','gurobi', 'verbose', 0);
 Res = optimize(Cons, Obj, Ops);
 
 x_vect = value(x);
+double(x)
 x_vect(x_vect<0.000009)=0;
 x_t = array2table(x_vect,'RowNames', Ids);
 writetable(x_t, strcat('weights_',string(Year),'.csv'), 'Delimiter', ',', 'QuoteStrings',true, 'WriteRowNames', true);

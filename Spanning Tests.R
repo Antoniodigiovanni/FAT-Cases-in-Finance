@@ -11,8 +11,8 @@ source("FAT_RM.R")
 
 # Spanning tests for the model: BM_m, GPA, NOA, I/A, Size, Momentum, Beta
 rm(Monthly_factors_list, Yearly_factors_list)
-Factors_list_y <- c("GPA","NOA","Momentum","Beta")
-Factors_list_m <- c("BM_m","LMV", "CP_m")
+Factors_list_y <- c("GPA","NOA","Beta", "ItA", "NSI", "AG")
+Factors_list_m <- c("BM_m", "Momentum")#,LMV", "CP_m")
 # 1. Calculate the returns of the hedge portfolio built by splitting the factors
 # into quintiles
 
@@ -53,7 +53,7 @@ calculate_factor_returns <- function(data, empty_df, factor) {
                LessSmall = "2", Small = "1", hedge.pf = "5-1", Date = "Date")
   portfolio_returns <- data[!is.na(pf.bm) & !is.na(RET.USD)] %>% # Some stocks are delisted but keep values from the prev fiscal y (dropping)
     group_by(Date, pf.bm) %>%                               
-    summarize(ret.port = weighted.mean(RET.USD, MV.USD.June)) %>%
+    summarize(ret.port = weighted.mean(RET.USD, MV.USD.June, na.rm = T)) %>%
     spread(pf.bm, ret.port) %>% mutate(hedge.pf = Big - Small) # %>% 
   names(portfolio_returns) <- namekey[names(portfolio_returns)]
   
@@ -150,23 +150,29 @@ factor_returns <- merge(factor_returns_m, factor_returns_y, by = "ym", all = T)
 rm(t_test, factor_returns_m, factor_returns_y, Alpha, ps, t5minus1, tAlpha, f,
    tt, tmp_factor, portfolio_returns, Avg, Factors_list_m, Factors_list_y, Factors_names)
 
-
+# Factors - Beta, BM_m, GPA, NOA, Momentum 
 # Perform Spanning Regressions
-factor_returns[,summary(lm(BM_m ~ LMV + GPA + NOA + Momentum + Beta + CP_m))]
-# Check if MV.USD is spanned by the model
-factor_returns[,summary(lm(CP_m ~ LMV + BM_m + GPA + NOA  + Momentum + Beta))]
+
+factor_returns[,summary(lm(BM_m ~ GPA + NOA + Momentum +  Beta))]
 
 # GPA's intercept is significantly different from zero
-factor_returns[,summary(lm(GPA ~ BM_m + CP_m + LMV  + NOA  + Momentum + Beta))]
+factor_returns[,summary(lm(GPA ~BM_m + NOA  + Momentum + Beta))]
+
 
 # The same for NOA, intercept not significantly different from zero
-factor_returns[,summary(lm(NOA ~ BM_m + GPA + LMV + Momentum + Beta + CP_m))]
+factor_returns[,summary(lm(NOA ~ BM_m + GPA + Momentum + Beta))]
 
 # No significant difference from zero in Beta 
-factor_returns[,summary(lm(Beta ~  LMV + GPA + BM_m  +  Momentum))]
+factor_returns[,summary(lm(Beta ~  GPA + BM_m + Momentum))]
 
 # Intercept of momentum is significantly different from zero
-factor_returns[,summary(lm(Momentum ~ BM_m + GPA + NOA + LMV + Beta))]
+factor_returns[,summary(lm(Momentum ~ BM_m + GPA + NOA + Beta))]
+
+# Try without Beta and Momentum
+
+factor_returns[,summary(lm(BM_m ~ GPA + NOA))]
+factor_returns[,summary(lm(GPA ~BM_m + NOA  ))]
+factor_returns[,summary(lm(NOA ~ BM_m + GPA ))]
 
 
 # Dropping some factors

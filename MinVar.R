@@ -73,6 +73,7 @@ meanWeights <- as.data.frame(matrix(nrow = length(Years_list)-1,
                                     ncol = 2))
 NumberOfStock <-as.data.frame(matrix(nrow = length(Years_list)-1,
                                      ncol = 2))
+Monthly_returns <- data.table()
 for (y in Years_list){
 
   # Loading Portfolio Weights
@@ -110,6 +111,7 @@ for (y in Years_list){
       filter(ym >= as.yearmon(paste0("Jul", year(as.yearmon(y)))) &
                ym < (as.yearmon(paste0("Jul", year(as.yearmon(y))))+1))
     stocks_temp <- stocks_ret
+    #monthly_ret <- stocks_ret
     stocks_ret <- stocks_ret %>% filter(Id %in% Weight$Id) %>% mutate(RET = (RET/100+1)) %>% 
       group_by(Id) %>% 
       summarise(Ret = prod(RET, na.rm = T)) %>% mutate(Ret = Ret-1)
@@ -122,8 +124,10 @@ for (y in Years_list){
     Portfolio_monthly_RET <- stocks_temp %>% group_by(ym) %>% 
       summarise(Portfolio_Excess_RET = sum(Excess_RET * x_vect, na.rm = T),
                 Port_RET = sum(RET/100 * x_vect, na.rm = T))
+    Monthly_returns <- rbind(Monthly_returns, Portfolio_monthly_RET)
     
-   
+    # Calculate portfolio monthly returns
+    # monthly_ret <- monthly_ret %>% mutate(RET=RET/100) %>% group_by(ym) %>% summarise(Portfolio_monthly_RET = sum(RET*x_vect, na.rm=T))
     
     Std_Dev <- Portfolio_monthly_RET %>% summarise(Std = sd(Port_RET)*sqrt(12))
     

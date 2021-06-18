@@ -132,14 +132,24 @@ Monthly_factors_list = c("CP_m", "BM_m", "EP_m", "Momentum")
 
 # Calculating the correlation matrix of factors
 
-Correlation_Matrix <- factors %>% select(-Id,-Date,-country,-month,-year,
-                                         -bm_dummy,-bm_m_dummy,-earnings_dummy,
-                                         -cashflow_dummy,-profits_dummy,-op_dummy,
+Correlation_Matrix <- factors %>% select(-Id,-Date,-country,-month,-year, -RET, -RET.USD, -LMV.USD, -MV.USD, -MV.USD.June,
+                                         -bm_dummy,-bm_m_dummy,-earnings_dummy, -earnings_m_dummy,
+                                         -cashflow_dummy, -cashflow_m_dummy, -profits_dummy,-op_dummy,
                                          eps_dummy,tey_dummy,-noa_dummy,-pf.size,
-                                         -oa_dummy,-hcjun,-ym, -eps_dummy)
-
+                                         -oa_dummy,-hcjun,-ym, -eps_dummy, -noa_dummy, -oa_dummy, -tey_dummy,
+                                         )
+is_negative <- function(x){
+  ifelse(x<0, 0, x)
+}
+Correlation_Matrix <- Correlation_Matrix %>% mutate(across(everything(),is_negative))
+Correlation_Matrix <- Correlation_Matrix %>% mutate(AG = ifelse(is.infinite(AG), NA, AG),
+                                                    ItA = ifelse(is.infinite(ItA), NA, ItA),
+                                                    NOA = ifelse(is.infinite(NOA), NA, NOA),
+                                                    BookToEV = ifelse(is.infinite(BookToEV), NA, BookToEV),
+                                                    QuickRatio = ifelse(is.infinite(QuickRatio), NA, QuickRatio))
 cor <- cor(Correlation_Matrix, use = "na.or.complete")
 as.data.table(cor) -> cor
 
+#write_csv(cor, "factor_correlations.csv")
 
 rm(cor, Correlation_Matrix)

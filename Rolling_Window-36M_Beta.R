@@ -11,8 +11,7 @@ setwd (dirname(getActiveDocumentContext()$path))
 # Set Date Language in English
 Sys.setlocale("LC_TIME", "C")
 
-load("FAT_monthly.RData")
-
+load(file.path("Data", "FAT_monthly.RData"))
 
 #### RMRF Calculation ####
 #Calculating Total Market Cap for each month
