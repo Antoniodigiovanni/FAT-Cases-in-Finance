@@ -537,3 +537,38 @@ IR <- IR %>% mutate(information_ratio = ((ret-bench)/sd))
 
 
 
+##TE and IR
+source("MSCI.R")
+MSCI_annRet <- (tail(MSCI_weighted$Portfolio_Value, n=1)/100)^(1/(2018-1998+1))-1
+EW_annRet <- (tail(Portfolio_Returns_EW$Portfolio_Value, n=1)/100)^(1/(2018-1998+1))-1
+VW_annRet <- (tail(Portfolio_Returns$Portfolio_Value, n=1)/100)^(1/(2018-1998+1))-1
+
+MSCI_monthly$ym <- as.yearmon(MSCI_monthly$Date)
+
+IR_ew<-merge(Portfolio_Returns_EW, MSCI_monthly[,c("ym", "MSCI_ret")], by="ym")
+IR_ew$SqDif <-(IR_ew$monthly_ret-IR_ew$MSCI_ret)^2
+IR_vw<-merge(Portfolio_Returns, MSCI_monthly[,c("ym", "MSCI_ret")], by="ym")
+IR_vw$SqDif <-(IR_vw$monthly_ret-IR_vw$MSCI_ret)^2
+
+
+
+##Tracking Error
+retPeriods <- 2018-1995+1-1
+
+#IR$help <-IR$portfolio_ret-InfRatio$YMR
+TE_ew <- as.data.frame(sqrt(sum(IR_ew$SqDif))/retPeriods)
+colnames(TE_ew)[1]<-"TrackingError-EW"
+TE_vw <- as.data.frame(sqrt(sum(IR_vw$SqDif))/retPeriods)
+colnames(TE_vw)[1]<-"TrackingError-VW"
+
+Results_TE <- merge(TE_ew, TE_vw)
+
+
+InfRatio_ew <- as.data.frame((EW_annRet-MSCI_annRet)/Results_TE$`TrackingError-EW`[1]*100)
+colnames(InfRatio_ew)[1]<-"Information Ratio-EW"
+InfRatio_vw <- as.data.frame((VW_annRet-MSCI_annRet)/Results_TE$`TrackingError-VW`[1]*100)
+colnames(InfRatio_vw)[1]<-"Information Ratio-VW"
+
+Results_IR <- merge(InfRatio_ew, InfRatio_vw)
+
+
