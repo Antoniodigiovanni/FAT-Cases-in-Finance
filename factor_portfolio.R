@@ -53,7 +53,7 @@ factor_port <- factor_port[ , bucket := ifelse(fac_score>top80, 1,
                                              ifelse(fac_score<=top20,5,NA)))))]
 
 
-inv_universe <- factor_port %>% filter(bucket == 1 | bucket == 2) %>% group_by(ym) %>% arrange(ym, desc(fac_score)) %>% select(-n_obs)
+inv_universe <- factor_port %>% filter(bucket == 1) %>% group_by(ym) %>% arrange(ym, desc(fac_score)) %>% select(-n_obs)
 univ_count <- inv_universe %>% summarise(n_obs = n())
 inv_universe <- merge(inv_universe, univ_count)
 
@@ -66,6 +66,24 @@ eq_cumreturn <- eq_port %>% group_by(ym) %>% summarise(monthly_ret = sum(weighte
 Eq_factor_portfolio <- eq_cumreturn %>% arrange(ym) %>%
   mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Eq_factor_portfolio$Portfolio_Value[1] <- 100
+
+# New turnover calculation
+test <- eq_port %>% select(ym, Id, country, LMV.USD, RET.USD, RET, weights, n_obs)
+test <- test %>% mutate(wlm = weights * (RET.USD/100) + 1)
+test2 <- test %>% summarise(sum_wlm = sum(wlm))
+test <- merge(test, test2, by = "ym")
+test <- test %>% mutate(new_weights = wlm/sum_wlm)
+test <- test %>% ungroup
+test <- test %>% group_by(Id)
+test <- test %>% mutate(lym = lag(ym),
+                        wlm = ifelse(is.na(wlm), 0, lag(new_weights)),
+                        lym = ifelse(is.na(lym), 0, lym))
+
+check <- test %>% filter(Id == "13117D")
+
+check <- check %>% mutate(cwg = ifelse(ym - 1/12 == lym, weights - wlm, weights))
+test <- test %>% mutate(cwg = ifelse(ym - 1/12 == lym, weights - wlm, weights))
+turnover <- test %>% ungroup %>% summarise(turnover = 0.5*sum(cwg)/T)
 
 # Yearly turnover (as per Hanauer, Lauterbach (2019))
 Weights_df <- eq_port %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
