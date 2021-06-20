@@ -18,6 +18,7 @@ FF5M <- read_csv("global_factor_premia_data.csv") %>%
            variable == "SMB" |
            variable == "HML" |
            variable == "CMA" |
+           variable == "MOM" |
            variable == "RMW_OPtBE") %>%
   rename(Country = market) %>% 
   mutate(return = return/100) #,cum = 100* (1 + ret))  
@@ -66,5 +67,6 @@ FF5M <- left_join(FF5M, EW_Factor_Portfolio_Monthly_RET, by=c("ym")) %>%
   mutate(Portfolio_RET = Portfolio_RET/100) 
 
 
-FF5M_Regression <- summary(lm(Portfolio_RET ~ RMRF + HML + SMB + CMA + RMW_OPtBE, data = FF5M))
+FF5M_Regression <- summary(lm(Portfolio_RET ~ RMRF + HML + SMB + CMA + RMW_OPtBE + MOM, data = FF5M))
 FF5M_Regression
+
