@@ -118,12 +118,34 @@ factors <- left_join(factors,
                      Momentum_short,
                      by=c("Id", "Date"))
 
-rm(Momentum)
+# Add volatility, first remove stocks with less than 12 months of return
+vol <- factors
+vol <- vol %>% ungroup %>% group_by(Id) %>% summarise(n_obs = n())
+vol <- vol %>% filter(n_obs > 12)
+vol <- merge(factors, vol, by = "Id")
+vol <-  vol %>% group_by(Id) %>% arrange(ym)
+# Rolling regression
+vol <- vol %>% mutate(roll_sd = rollapply(RET, ifelse(n_obs<36, n_obs, 36), sd, align="right", fill=NA))
+vol <- vol %>% select(Id, ym, roll_sd)
+vol <- vol %>% mutate(month = month(ym)) %>% filter(month == 6)
+vol <- vol %>% mutate(year = year(ym))
+vol <- vol %>% select(Id, roll_sd, year)
+
+factors[,hcjun := ifelse(month>=7,year,year-1)]
+factors <- merge(factors, vol, by.x = c("Id", "hcjun"), by.y = c("Id", "year"), all.x = TRUE)
+factors <- factors %>% rename(Vol = roll_sd)
+
+
+
+
+
+
+rm(Momentum, vol)
 # Complete list of Factors passed to other scripts
 # Add "Beta" to the list once fixed (now it is a list embedded in a df and errors arise from this)
 Yearly_factors_list = (c("Beta", "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",
                           "OL", "NOA", "AG", "ItA","EPS", "TEY", "BookToEV", 
-                          "DtoE", "QuickRatio", "NSI"))
+                          "DtoE", "QuickRatio", "NSI", "Vol"))
 
 Monthly_factors_list = c("CP_m", "BM_m", "EP_m", "Momentum")
 

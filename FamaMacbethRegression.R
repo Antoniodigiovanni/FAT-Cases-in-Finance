@@ -750,7 +750,7 @@ value2 <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.e
 # We dont include here some of the profitability variables because we had high correlation between some of them
 cross_reg <- factors %>% 
   select(Id, ym, RET, Beta, BM_m, bm_m_dummy,ROE, ROA, GPA, profits_dummy, OPBE, op_dummy,
-         NOA, noa_dummy, AG, MV.USD.June, Momentum, country) %>% 
+         NOA, noa_dummy, OA, oa_dummy, AG, MV.USD.June, Momentum, country) %>% 
   drop_na(.) %>% 
   filter(AG != "Inf")
 
@@ -762,7 +762,8 @@ cross_reg <- cross_reg %>%
   group_by(Id) %>%  
   mutate(mean_Beta=mean(Beta), mean_roe=mean(ROE), mean_roa = mean(ROA),
          mean_gpa = mean(GPA), mean_opbe=mean(OPBE), mean_noa = mean(NOA), mean_ag=mean(AG),
-         mean_mom=mean(Momentum), mean_bmm=mean(BM_m), mean_size=mean(MV.USD.June))
+         mean_mom=mean(Momentum), mean_bmm=mean(BM_m), mean_size=mean(MV.USD.June),
+         mean_oa=mean(OA))
 
 cut_bmm_top <- quantile(cross_reg$mean_bmm, 0.99)
 cut_bmm_bottom <- quantile(cross_reg$mean_bmm, 0.01)
@@ -785,6 +786,9 @@ cut_opbe_bottom <- quantile(cross_reg$mean_opbe, 0.01)
 cut_noa_top <- quantile(cross_reg$mean_noa, 0.99)
 cut_noa_bottom <- quantile(cross_reg$mean_noa, 0.01)
 
+cut_oa_top <- quantile(cross_reg$mean_oa, 0.99)
+cut_oa_bottom <- quantile(cross_reg$mean_oa, 0.01)
+
 cut_ag_top <- quantile(cross_reg$mean_ag, 0.99)
 cut_ag_bottom <- quantile(cross_reg$mean_ag, 0.01)
 
@@ -804,6 +808,8 @@ cross_reg <- cross_reg %>%
          outlier_opbe_bottom = mean_opbe <= cut_opbe_bottom,
          outlier_noa_top = (mean_noa >= cut_noa_top), 
          outlier_noa_bottom = mean_noa <= cut_noa_bottom,
+         outlier_oa_top = (mean_oa >= cut_oa_top), 
+         outlier_oa_bottom = mean_oa <= cut_oa_bottom,
          outlier_ag_top = (mean_ag >= cut_ag_top), 
          outlier_ag_bottom = mean_ag <= cut_ag_bottom,
          outlier_mom_top = (mean_mom >= cut_mom_top), 
@@ -819,6 +825,7 @@ cross_reg <- cross_reg %>%
   filter(!outlier_beta_top & ! outlier_beta_bottom &
            !outlier_opbe_top & ! outlier_opbe_bottom &
            !outlier_gpa_top & ! outlier_gpa_bottom &
+           !outlier_oa_top & ! outlier_oa_bottom &
            !outlier_noa_top & ! outlier_noa_bottom &
            !outlier_ag_top & ! outlier_ag_bottom &
            !outlier_mom_top & ! outlier_mom_bottom &
@@ -827,32 +834,35 @@ cross_reg <- cross_reg %>%
            !outlier_roe_top & ! outlier_roe_bottom &
            !outlier_roa_top & ! outlier_roa_bottom)
 
-cross_reg <- cross_reg %>% select(1:18)
+cross_reg <- cross_reg %>% select(1:20)
 cross_reg <- data.table(cross_reg)
 
 cross_reg[OPBE<0]$OPBE <- 0
 cross_reg[BM_m<0]$BM_m <- 0
 cross_reg[GPA<0]$GPA <- 0
 cross_reg[NOA<0]$NOA <- 0
+cross_reg[OA<0]$OA <- 0
 
-CS.reg.estimates <- cross_reg[, .(intercept=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[1],
-                                  beta=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[2],
-                                  bm_m=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[3],
-                                  roe=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[4],
-                                  roa=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[5],
-                                  gpa=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[6],
-                                  opbe=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[7],
-                                  noa=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[8],
-                                  ag=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[9],
-                                  size=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[10],
-                                  mom=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[11],
-                                  kor=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[12],
-                                  sgp=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[13],
-                                  twn = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[14],
-                                  bm_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[15],
-                                  op_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[16],
-                                  prof_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[17],
-                                  noa_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy)$coefficient[18],
+CS.reg.estimates <- cross_reg[, .(intercept=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[1],
+                                  beta=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[2],
+                                  bm_m=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[3],
+                                  roe=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[4],
+                                  roa=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[5],
+                                  gpa=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[6],
+                                  opbe=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[7],
+                                  noa=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[8],
+                                  oa = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[9],
+                                  ag=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[10],
+                                  size=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[11],
+                                  mom=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[12],
+                                  kor=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[13],
+                                  sgp=lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[14],
+                                  twn = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[15],
+                                  bm_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[16],
+                                  op_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[17],
+                                  prof_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[18],
+                                  noa_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[19],
+                                  oa_dummy = lm(RET~Beta+BM_m+ROE+ROA+GPA+OPBE+NOA+OA+AG+MV.USD.June+Momentum+as.factor(country)+bm_m_dummy+op_dummy+profits_dummy+noa_dummy+oa_dummy)$coefficient[20],
                                   no.obs=length(Id)),by=ym]
 
 profitability <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, CS.reg.estimates[, t.test(beta)]$statistic),
@@ -862,6 +872,7 @@ profitability <- data.table(Beta = c(CS.reg.estimates[,t.test(beta)]$estimate, C
                      GPA = c(CS.reg.estimates[,t.test(gpa)]$estimate, CS.reg.estimates[, t.test(gpa)]$statistic),
                      OPBE = c(CS.reg.estimates[,t.test(opbe)]$estimate, CS.reg.estimates[, t.test(opbe)]$statistic),
                      NOA = c(CS.reg.estimates[,t.test(noa)]$estimate, CS.reg.estimates[, t.test(noa)]$statistic),
+                     OA = c(CS.reg.estimates[,t.test(oa)]$estimate, CS.reg.estimates[, t.test(oa)]$statistic),
                      AG = c(CS.reg.estimates[,t.test(ag)]$estimate, CS.reg.estimates[, t.test(ag)]$statistic),
                      Size = c(CS.reg.estimates[,t.test(size)]$estimate, CS.reg.estimates[, t.test(size)]$statistic),
                      Mom = c(CS.reg.estimates[,t.test(mom)]$estimate, CS.reg.estimates[, t.test(mom)]$statistic))
