@@ -83,10 +83,14 @@ check <- test %>% filter(Id == "13117D")
 
 check <- check %>% mutate(cwg = ifelse(ym - 1/12 == lym, abs(weights - wlm), weights))
 test <- test %>% mutate(cwg = ifelse(ym - 1/12 == lym, abs(weights - wlm), weights))
-turnover <- test %>% ungroup %>% summarise(turnover = 0.5*sum(cwg)/T)
-
 T <- test %>% group_by(ym) %>% summarise(t = n())
 T <- nrow(T)
+transactioncost <- test %>% ungroup %>% group_by(ym) %>% summarise(costs = sum(cwg)/100)
+sum(transactioncost$costs)
+mean(transactioncost$costs)
+
+turnover <- test %>% ungroup %>% summarise(turnover = 0.5*sum(cwg)/T)
+
 
 # Yearly turnover (as per Hanauer, Lauterbach (2019))
 Weights_df <- eq_port %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
@@ -167,6 +171,30 @@ cum_return_vw <- vw_port %>% group_by(ym) %>% summarise(monthly_ret = sum(weight
 VW_Factor_Portfolio <- cum_return_vw %>% arrange(ym) %>%
   mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 VW_Factor_Portfolio$Portfolio_Value[1] <- 100
+
+# New turnover calculation for value-weighted pf
+turnover_vw <- vw_port %>% select(ym, Id, country, LMV.USD, RET.USD, RET, weights, n_obs) %>% mutate(weights = weights*100)
+turnover_vw <- turnover_vw %>% mutate(wlm = weights * (RET.USD/100 + 1))
+hdf <- turnover_vw %>% summarise(sum_wlm = sum(wlm))
+turnover_vw <- merge(turnover_vw, hdf, by = "ym")
+turnover_vw <- turnover_vw %>% mutate(new_weights = (wlm/sum_wlm)*100)
+turnover_vw <- turnover_vw %>% ungroup
+turnover_vw <- turnover_vw %>% group_by(Id)
+turnover_vw <- turnover_vw %>% mutate(lym = lag(ym),
+                        wlm = ifelse(is.na(wlm), 0, lag(new_weights)),
+                        lym = ifelse(is.na(lym), 0, lym))
+
+check <- turnover_vw %>% filter(Id == "13117D")
+
+check <- check %>% mutate(cwg = ifelse(ym - 1/12 == lym, abs(weights - wlm), weights))
+turnover_vw <- turnover_vw %>% mutate(cwg = ifelse(ym - 1/12 == lym, abs(weights - wlm), weights))
+T <- turnover_vw %>% group_by(ym) %>% summarise(t = n())
+T <- nrow(T)
+transactioncost <- turnover_vw %>% ungroup %>% group_by(ym) %>% summarise(costs = sum(cwg)/100)
+sum(transactioncost$costs)
+mean(transactioncost$costs)
+
+turnover_vw <- turnover_vw %>% ungroup %>% summarise(turnover = sum(cwg)/T)
 
 # Yearly turnover (as per Hanauer, Lauterbach (2019))
 Weights_df <- vw_port %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
