@@ -70,3 +70,6 @@ FF5M <- left_join(FF5M, EW_Factor_Portfolio_Monthly_RET, by=c("ym")) %>%
 FF5M_Regression <- summary(lm(Portfolio_RET ~ RMRF + HML + SMB + CMA + RMW_OPtBE + MOM, data = FF5M))
 FF5M_Regression
 
+# Saving the RData file
+#FF5FM <- FF5M %>% select(-Portfolio_RET)
+#save(FF5FM, file = "Fama_French_5_Factors_Model.RData")
