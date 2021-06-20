@@ -140,7 +140,7 @@ factors <- factors %>% rename(Vol = roll_sd)
 
 
 
-rm(Momentum, vol)
+rm(Momentum, vol, Momentum_short)
 # Complete list of Factors passed to other scripts
 # Add "Beta" to the list once fixed (now it is a list embedded in a df and errors arise from this)
 Yearly_factors_list = (c("Beta", "BM", "EP", "CP", "ROE", "ROA", "GPA", "OPBE", "OA",

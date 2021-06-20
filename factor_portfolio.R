@@ -68,31 +68,27 @@ Eq_factor_portfolio <- eq_cumreturn %>% arrange(ym) %>%
 Eq_factor_portfolio$Portfolio_Value[1] <- 100
 
 # New turnover calculation
-test <- eq_port %>% select(ym, Id, country, LMV.USD, RET.USD, RET, weights, n_obs) %>% mutate(weights = weights*100)
-test <- test %>% mutate(wlm = weights * (RET.USD/100 + 1))
-test2 <- test %>% summarise(sum_wlm = sum(wlm))
-test <- merge(test, test2, by = "ym")
-test <- test %>% mutate(new_weights = (wlm/sum_wlm)*100)
-test <- test %>% ungroup
-test <- test %>% group_by(Id)
-test <- test %>% mutate(lym = lag(ym),
+turnover_ew <- eq_port %>% select(ym, Id, country, LMV.USD, RET.USD, RET, weights, n_obs) %>% mutate(weights = weights*100)
+turnover_ew <- turnover_ew %>% mutate(wlm = weights * (RET.USD/100 + 1))
+dfh <- turnover_ew %>% summarise(sum_wlm = sum(wlm))
+turnover_ew <- merge(turnover_ew, dfh, by = "ym")
+turnover_ew <- turnover_ew %>% mutate(new_weights = (wlm/sum_wlm)*100)
+turnover_ew <- turnover_ew %>% ungroup
+turnover_ew <- turnover_ew %>% group_by(Id)
+turnover_ew <- turnover_ew %>% mutate(lym = lag(ym),
                         wlm = ifelse(is.na(wlm), 0, lag(new_weights)),
                         lym = ifelse(is.na(lym), 0, lym))
 
-check <- test %>% filter(Id == "13117D")
+#check <- test %>% filter(Id == "13117D")
 
-check <- check %>% mutate(cwg = ifelse(ym - 1/12 == lym, abs(weights - wlm), weights))
-test <- test %>% mutate(cwg = ifelse(ym - 1/12 == lym, abs(weights - wlm), weights))
-T <- test %>% group_by(ym) %>% summarise(t = n())
+#check <- check %>% mutate(cwg = ifelse(ym - 1/12 == lym, abs(weights - wlm), weights))
+turnover_ew <- turnover_ew %>% mutate(cwg = ifelse(ym - 1/12 == lym, abs(weights - wlm), weights))
+T <- turnover_ew %>% group_by(ym) %>% summarise(t = n())
 T <- nrow(T)
-transactioncost <- test %>% ungroup %>% group_by(ym) %>% summarise(costs = sum(cwg)/100)
-sum(transactioncost$costs)
-mean(transactioncost$costs)
-
-turnover <- test %>% ungroup %>% summarise(turnover = 0.5*sum(cwg)/T)
 
 
-# Yearly turnover (as per Hanauer, Lauterbach (2019))
+turnover_ew <- turnover_ew %>% ungroup %>% summarise(turnover = sum(cwg)/T)
+
 Weights_df <- eq_port %>% group_by(ym) %>% select(Id, ym, weights) %>% spread(ym, weights)
 Weights_df <- Weights_df %>% replace(is.na(.),0)
 T <- ncol(Weights_df) - 1 #1 column per year + 1 for the Ids
@@ -101,11 +97,6 @@ names(transposed_Weights) <- Weights_df$Id
 transposed_Weights <- transposed_Weights[-1,]
 transposed_Weights <- transposed_Weights %>% mutate(across(where(is.factor), as.character))
 transposed_Weights <- transposed_Weights %>% mutate(across(where(is.character), as.numeric))
-to <- function(weight){
-  result <- abs(lead(weight) - weight)
-}
-Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
-Turnover <- sum(Turnover_df)/(2*T)
 
 # Effective N (as per Hanauer, Lauterbach (2019))
 eN <- function(weight){
@@ -115,8 +106,8 @@ Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
 inverse <- function(weight){
   result <- 1/weight
 }
-Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
-Effective_N <- Effective_N/T
+Effective_N_EW <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N_EW <- Effective_N_EW/T
 
 # Sharpe Ratio
 FF <- read_csv("FF Monthly.CSV") %>% 
@@ -128,9 +119,9 @@ Eq_factor_portfolio <- Eq_factor_portfolio %>% mutate(Year = year(ym))
 sd_dev <- sd(Eq_factor_portfolio$monthly_ret)*sqrt(12)
 Yearly_ret <- Eq_factor_portfolio %>% group_by(Year) %>% summarise(Yret = prod(ret))
 Yearly_ret <- merge(Yearly_ret, FF, by = "Year")
-SR <- Yearly_ret
-SR <- SR %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
-SR <- SR %>% mutate(sharpe_ratio = (ret-rf)/sd)
+SR_EW <- Yearly_ret
+SR_EW <- SR_EW %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
+SR_EW <- SR_EW %>% mutate(sharpe_ratio = (ret-rf)/sd)
 
 # Hit Rate
 hit_rate <- eq_port %>% filter(weights > 0) %>% mutate(hit = ifelse(RET>0, 1, 0))
@@ -205,11 +196,6 @@ names(transposed_Weights) <- Weights_df$Id
 transposed_Weights <- transposed_Weights[-1,]
 transposed_Weights <- transposed_Weights %>% mutate(across(where(is.factor), as.character))
 transposed_Weights <- transposed_Weights %>% mutate(across(where(is.character), as.numeric))
-to <- function(weight){
-  result <- abs(lead(weight) - weight)
-}
-Turnover_df <- transposed_Weights %>% mutate(across( .fns = to)) %>% drop_na()
-Turnover <- sum(Turnover_df)/(2*T)
 
 # Effective N (as per Hanauer, Lauterbach (2019))
 eN <- function(weight){
@@ -219,8 +205,8 @@ Effective_N_df <- transposed_Weights %>% mutate(across(.fns = eN))
 inverse <- function(weight){
   result <- 1/weight
 }
-Effective_N <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
-Effective_N <- Effective_N/T
+Effective_N_VW <- as.data.frame(rowSums(Effective_N_df)) %>% mutate(across( .fns = inverse)) %>% sum()
+Effective_N_VW <- Effective_N_VW/T
 
 # Sharpe Ratio
 FF <- read_csv("FF Monthly.CSV") %>% 
@@ -236,9 +222,9 @@ SR_vw <- Yearly_ret
 SR_vw <- SR_vw %>% summarise(sd = sd_dev, ret = (mean(Yret)-1)*100, rf = (mean(YRF)-1)*100)
 SR_vw <- SR_vw %>% mutate(sharpe_ratio = (ret-rf)/sd)
 
-top10 <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
-top10 <- top10 %>% summarise(avg_weight = mean(weights)) 
-mean(top10$avg_weight)
+top10_vw <- vw_port %>% group_by(ym) %>% arrange(desc(weights)) %>% slice_head(n = 10)
+top10_vw <- top10_vw %>% summarise(avg_weight = mean(weights)) 
+mean(top10_vw$avg_weight)
 
 
 # Maximum Drawdown
@@ -312,11 +298,6 @@ vw_port <- merge(inv_universe, total_mv_yearly, by = "ym")
 
 vw_port <- vw_port %>% group_by(ym)  %>%  
   mutate(weights = LMV.USD / mv_total)
-# weights = ifelse(weights < 0.0001, 0, weights),
-# weights = ifelse(weights > 0.10, 0.10, weights),
-# cum_weights = cumsum(weights),
-# weighted_return = weights * RET.USD)
-
 
 # Limiting weights to 10%
 Weight_limit <- 0.1
