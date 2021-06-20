@@ -67,6 +67,8 @@ Eq_factor_portfolio <- eq_cumreturn %>% arrange(ym) %>%
   mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Eq_factor_portfolio$Portfolio_Value[1] <- 100
 
+save(Eq_factor_portfolio, file = "EW_Portfolio.RData")
+
 # New turnover calculation
 turnover_ew <- eq_port %>% select(ym, Id, country, LMV.USD, RET.USD, RET, weights, n_obs) %>% mutate(weights = weights*100)
 turnover_ew <- turnover_ew %>% mutate(wlm = weights * (RET.USD/100 + 1))
@@ -414,6 +416,8 @@ cum_return_mpf <- mpf %>% group_by(ym) %>% summarise(monthly_ret = sum(weighted_
 Portfolio_Returns <- cum_return_mpf %>% arrange(ym) %>%
   mutate(ret = 1+monthly_ret/100) %>% mutate(Portfolio_Value = 100*lag(cumprod(ret)))
 Portfolio_Returns$Portfolio_Value[1] <- 100
+
+save(Portfolio_Returns, file = "Market_Portfolio.RData")
 
 write.csv(Portfolio_Returns, "vw_market.csv")
 write.csv(Eq_factor_portfolio, "eq_port.csv")
